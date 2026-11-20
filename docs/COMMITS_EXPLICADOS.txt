@@ -1,0 +1,756 @@
+===============================================================================
+            EXPLICADOR DE CÓDIGO — CADA COMMIT EXPLICADO
+===============================================================================
+
+Padrão usado: Conventional Commits  →  tipo(escopo): descrição
+
+  feat     nova funcionalidade          fix    correção de bug
+  test     testes                       docs   documentação
+  style    visual / formatação          build  Docker, dependências, build
+  ci       integração contínua          chore  manutenção / configuração
+
+Fluxo de branches: main ← develop ← feature/*, fix/*, chore/*, ci/*, docs/*
+Cada branch entra na develop com "merge --no-ff" (o commit de merge mostra
+claramente o que pertence a cada funcionalidade). A develop vai para a main
+apenas na release (tag v1.0.0).
+
+Para cada commit: HASH · DATA · BRANCH, o que mudou e qual problema resolve.
+Os hashes batem com o "git log" do repositório.
+
+-------------------------------------------------------------------------------
+#01  chore: inicializa repositório com arquivos base
+     4612fd1 · 20/11/2026 14:03 · branch main
+
+     O QUE MUDOU
+     Cria a base do repositório: .gitignore (ignora node_modules, builds e
+     principalmente arquivos .env), .editorconfig (mesma indentação e fim
+     de linha em qualquer editor), .gitattributes (força LF, evitando
+     diffs gigantes entre Windows e Linux), licença MIT e um README
+     inicial.
+
+     QUAL PROBLEMA RESOLVE
+     Sem um .gitignore desde o primeiro commit, é comum versionar sem
+     querer node_modules ou, pior, um .env com senhas — e o que entra no
+     histórico do git fica lá para sempre. Padronizar fim de linha evita
+     que o mesmo arquivo pareça 'todo alterado' quando editado no Windows.
+
+-------------------------------------------------------------------------------
+#02  chore(backend): cria projeto NestJS 12 com Vitest e oxlint
+     b2b270a · 20/11/2026 14:04 · branch feature/backend-setup
+
+     O QUE MUDOU
+     Gera a API com o CLI oficial do Nest 12 (projeto ESM, TypeScript
+     estrito, Vitest e oxlint) e remove o @nestjs/observe, módulo de
+     telemetria que o gerador adiciona por padrão.
+
+     QUAL PROBLEMA RESOLVE
+     Começar pelo gerador oficial garante uma base compatível com a versão
+     mais nova do framework. A telemetria foi removida porque um projeto
+     que lê código de terceiros não deve enviar dados para serviços
+     externos sem necessidade.
+
+-------------------------------------------------------------------------------
+#03  feat(config): valida variáveis de ambiente com Zod na inicialização
+     5a3820b · 20/11/2026 14:04 · branch feature/backend-setup
+
+     O QUE MUDOU
+     Cria config/env.ts com um schema Zod para todas as variáveis de
+     ambiente (porta, banco, Redis, JWT, limites, IA), valores padrão e
+     mensagens claras. Inclui .env.example documentado e 3 testes.
+
+     QUAL PROBLEMA RESOLVE
+     Problema clássico: a aplicação sobe com uma variável faltando e só
+     quebra minutos depois, num ponto qualquer. Pior: sobe em produção com
+     um JWT_SECRET fraco. Validando na inicialização, a API se recusa a
+     subir e diz exatamente o que está errado ('fail fast').
+
+-------------------------------------------------------------------------------
+#04  feat(health): adiciona endpoint de liveness e bootstrap seguro
+     25719e9 · 20/11/2026 14:04 · branch feature/backend-setup
+
+     O QUE MUDOU
+     Adiciona GET /api/health e configura o main.ts: prefixo /api, logs
+     com campos sensíveis mascarados (password, authorization, cookie,
+     token), trust proxy, remoção do header X-Powered-By e shutdown
+     gracioso.
+
+     QUAL PROBLEMA RESOLVE
+     Orquestradores (Docker, Kubernetes) precisam saber se o processo está
+     vivo. Mascarar campos nos logs evita que senhas e tokens apareçam em
+     ferramentas de log. Esconder o X-Powered-By tira de um atacante a
+     informação de qual framework está rodando.
+
+  ↳ b12e697 · 20/11/2026 14:04 · MERGE de feature/backend-setup na develop (merge --no-ff)
+
+-------------------------------------------------------------------------------
+#05  chore(infra): adiciona docker compose de desenvolvimento
+     efc9e9a · 20/11/2026 14:06 · branch feature/database
+
+     O QUE MUDOU
+     docker-compose.dev.yml com PostgreSQL 16 e Redis 7, healthchecks e
+     portas publicadas apenas em 127.0.0.1.
+
+     QUAL PROBLEMA RESOLVE
+     Quem clona o projeto não precisa instalar Postgres e Redis na
+     máquina. Publicar só em 127.0.0.1 impede que o banco de
+     desenvolvimento fique acessível para outras máquinas da rede (ex.:
+     Wi-Fi público).
+
+-------------------------------------------------------------------------------
+#06  feat(database): modela usuários e análises com Prisma 7
+     e4d63d2 · 20/11/2026 14:06 · branch feature/database
+
+     O QUE MUDOU
+     Schema Prisma com as tabelas users e analyses, enums SourceType
+     (PASTE/ZIP/GITHUB) e AnalysisStatus (QUEUED/PROCESSING/DONE/FAILED),
+     índice (user_id, created_at desc), cascade ao excluir usuário, a
+     migration inicial e o PrismaService (cliente único com
+     @prisma/adapter-pg). Habilita scripts de instalação apenas para o
+     Prisma (allowScripts do npm 11).
+
+     QUAL PROBLEMA RESOLVE
+     Modela o domínio com tipos fortes no banco (enums em vez de texto
+     livre) e um índice para a consulta mais comum (listar as análises de
+     uma pessoa por data). Decisão de privacidade: o código analisado NÃO
+     é salvo, só o resultado. Um único PrismaClient evita esgotar conexões
+     do banco.
+
+-------------------------------------------------------------------------------
+#07  feat(health): adiciona readiness check do banco de dados
+     9483dba · 20/11/2026 14:06 · branch feature/database
+
+     O QUE MUDOU
+     GET /api/ready executa SELECT 1 com timeout de 2s usando o Terminus e
+     responde 503 se o banco estiver fora.
+
+     QUAL PROBLEMA RESOLVE
+     Diferença entre liveness e readiness: o processo pode estar vivo mas
+     sem banco. O Docker usa o /ready para só mandar tráfego quando a API
+     consegue de fato atender.
+
+  ↳ d39e2a6 · 20/11/2026 14:06 · MERGE de feature/database na develop (merge --no-ff)
+
+-------------------------------------------------------------------------------
+#08  feat(users): adiciona repositório de usuários sem expor o hash da senha
+     38adf5c · 20/11/2026 14:09 · branch feature/auth
+
+     O QUE MUDOU
+     UsersRepository com seleção explícita de campos públicos; o hash só
+     sai em findCredentials(). Violação de e-mail único (código P2002 do
+     Prisma) vira HTTP 409.
+
+     QUAL PROBLEMA RESOLVE
+     Evita o vazamento acidental do hash da senha numa resposta ou log
+     (basta um 'return user' descuidado). Tratar a violação de unicidade
+     em vez de 'consultar antes e depois inserir' elimina uma condição de
+     corrida: duas requisições simultâneas poderiam passar pela consulta e
+     criar o mesmo e-mail duas vezes.
+
+-------------------------------------------------------------------------------
+#09  feat(auth): implementa cadastro, login e JWT com refresh token rotativo
+     3a48262 · 20/11/2026 14:09 · branch feature/auth
+
+     O QUE MUDOU
+     Usa @nestjs/authentication: guard global (todas as rotas exigem
+     login, exceto @Public), hash scrypt, verificação em tempo constante,
+     access token de 15 min e refresh token em cookie httpOnly +
+     SameSite=Strict + path /api/auth. Implementa um RefreshTokenStore
+     próprio no Postgres (tabelas refresh_tokens e
+     revoked_token_families), guardando apenas o SHA-256 dos tokens.
+     Regras de senha no cadastro e rejeição de campos desconhecidos.
+
+     QUAL PROBLEMA RESOLVE
+     Resolve vários problemas de segurança de uma vez: (1) 'fechado por
+     padrão' evita esquecer de proteger uma rota nova; (2) o login
+     responde no mesmo tempo para e-mail inexistente e senha errada,
+     impedindo descobrir quais e-mails existem; (3) o cookie httpOnly
+     impede que um script malicioso (XSS) leia o refresh token; (4) com
+     rotação, um refresh token roubado e reutilizado revoga toda a família
+     — o ladrão perde o acesso; (5) campos extras no body (ex.: 'role':
+     'admin') são recusados.
+
+-------------------------------------------------------------------------------
+#10  test(auth): cobre fluxo de autenticação ponta a ponta
+     7f4a975 · 20/11/2026 14:09 · branch feature/auth
+
+     O QUE MUDOU
+     Testes e2e com Supertest contra Postgres real: cadastro, rota
+     protegida com e sem token, rotação do refresh, detecção de reuso,
+     mesma resposta para e-mail inexistente x senha errada, 409 e 400.
+
+     QUAL PROBLEMA RESOLVE
+     Autenticação é a parte em que um erro custa mais caro. Os testes
+     garantem que as proteções continuam funcionando em qualquer mudança
+     futura.
+
+  ↳ 897eea8 · 20/11/2026 14:09 · MERGE de feature/auth na develop (merge --no-ff)
+
+-------------------------------------------------------------------------------
+#11  feat(analyzer): adiciona tipos, linguagens e normalização segura de arquivos
+     7b4c36b · 20/11/2026 14:23 · branch feature/analyzer-engine
+
+     O QUE MUDOU
+     Define o contrato do motor (types.ts), o mapa extensão → linguagem
+     com estatísticas (languages.ts) e a normalização de entrada
+     (normalize.ts): bloqueia path traversal (../, caminhos absolutos,
+     byte nulo), ignora node_modules/builds/binários/lockfiles e aplica
+     limites de quantidade e tamanho.
+
+     QUAL PROBLEMA RESOLVE
+     Toda entrada vinda de fora é hostil até prova em contrário.
+     Normalizar num único lugar garante que nenhuma origem (colar, zip,
+     GitHub) escape das regras. Ignorar dependências e builds deixa a
+     análise focada no código que a pessoa escreveu.
+
+-------------------------------------------------------------------------------
+#12  feat(analyzer): detecta stack e versões a partir de manifestos e imports
+     61039a7 · 20/11/2026 14:23 · branch feature/analyzer-engine
+
+     O QUE MUDOU
+     Catálogo com ~120 tecnologias (descrição + provável motivo da
+     escolha) e parsers de package.json, requirements.txt, pyproject.toml,
+     pom.xml, Gradle, go.mod, Cargo.toml, composer.json, Gemfile, .csproj,
+     Dockerfile, docker-compose, workflows de CI, Terraform, Kubernetes e
+     schema.prisma. Sem manifesto, os imports do código revelam as
+     bibliotecas.
+
+     QUAL PROBLEMA RESOLVE
+     É o que permite responder 'quais tecnologias e versões' com precisão
+     (lendo o que o projeto declara, em vez de adivinhar) e explicar o
+     PORQUÊ de cada uma — o que torna o relatório didático para júniores.
+
+-------------------------------------------------------------------------------
+#13  feat(analyzer): identifica padrões de arquitetura e monta árvore de pastas
+     a330dd2 · 20/11/2026 14:23 · branch feature/analyzer-engine
+
+     O QUE MUDOU
+     12 regras de arquitetura (modular do Nest, camadas, Clean/Hexagonal,
+     DDD, MVC, Django, CQRS, eventos, monorepo, microsserviços,
+     componentes, feature folders, serverless), cada uma com explicação,
+     possível motivo e evidências; e uma árvore de pastas resumida.
+
+     QUAL PROBLEMA RESOLVE
+     Responde 'como a estrutura foi feita e por quê'. As evidências
+     mostram ao leitor de onde a conclusão veio, em vez de afirmar sem
+     prova.
+
+-------------------------------------------------------------------------------
+#14  feat(analyzer): deduz a ideia, o domínio e o público do projeto
+     b22d1c8 · 20/11/2026 14:23 · branch feature/analyzer-engine
+
+     O QUE MUDOU
+     Vocabulário de 18 domínios de negócio (pt/en) pontuado em caminhos,
+     declarações, rotas e README; classificação do tipo de projeto (API,
+     SPA, full-stack, CLI, mobile, biblioteca, dados, bot, jogo); extração
+     de rotas de Nest, Express/Fastify/Koa/Hono, FastAPI, Flask, Django,
+     Spring, ASP.NET, Laravel e Go; e a montagem do resumo e do 'para quem
+     serve'.
+
+     QUAL PROBLEMA RESOLVE
+     É a primeira seção do relatório: 'se a pessoa criou uma API bancária,
+     o explicador deve entender isso e dizer para quem serve'. O limite
+     mínimo de pontuação evita afirmar um domínio com pouca evidência.
+
+-------------------------------------------------------------------------------
+#15  feat(analyzer): extrai funções e mede complexidade e aninhamento
+     1a0b605 · 20/11/2026 14:23 · branch feature/analyzer-engine
+
+     O QUE MUDOU
+     Reconhece assinaturas de funções em 15+ linguagens e encontra o fim
+     do bloco por contagem de chaves (ignorando strings e comentários),
+     por indentação (Python) ou por 'end' (Ruby). Calcula complexidade
+     ciclomática aproximada e profundidade de aninhamento.
+
+     QUAL PROBLEMA RESOLVE
+     Base para duas coisas: escolher trechos para destacar (com número de
+     linha real) e medir qualidade (funções longas e complexas são as mais
+     difíceis de manter).
+
+-------------------------------------------------------------------------------
+#16  feat(security): detecta segredos expostos e mascara trechos do relatório
+     a529025 · 20/11/2026 14:23 · branch feature/analyzer-engine
+
+     O QUE MUDOU
+     Procura chaves AWS, GitHub, Anthropic, Stripe, Google, Slack, chaves
+     privadas, JWTs fixos, strings de conexão com senha, atribuições de
+     senha e .env versionado. Ignora placeholders e arquivos de exemplo.
+     Guarda só uma prévia mascarada (ex.: AKIA************).
+
+     QUAL PROBLEMA RESOLVE
+     Segredo no código é uma das falhas mais comuns (e mais graves) —
+     principalmente em código gerado às pressas. Além de alertar, o
+     relatório e o envio para a IA nunca mostram o valor real: a
+     ferramenta não pode virar um vazamento.
+
+-------------------------------------------------------------------------------
+#17  feat(analyzer): seleciona e explica os trechos mais importantes
+     1bff926 · 20/11/2026 14:23 · branch feature/analyzer-engine
+
+     O QUE MUDOU
+     Classifica o papel de cada arquivo (caso de uso, service, controller,
+     rotas, guard, repository, hook, componente, modelo, entrada,
+     utilitário), escolhe a função mais 'explicável' de cada arquivo
+     importante e gera: o que faz, padrões observados (transação, decimal
+     para dinheiro, hash de senha, guard clauses, DI, validação, cache,
+     eventos...) e o que há de interessante, com dicas gentis quando o
+     trecho é longo ou complexo.
+
+     QUAL PROBLEMA RESOLVE
+     É a terceira seção pedida: 'destacar a service de usuários, mostrar o
+     trecho e explicar o que achei interessante'. Limitar a diversidade
+     (no máximo 2 services e 1 de cada outro papel) evita um relatório com
+     6 controllers parecidos.
+
+-------------------------------------------------------------------------------
+#18  feat(analyzer): calcula nota de 0 a 10 com sugestões construtivas
+     d1757ed · 20/11/2026 14:23 · branch feature/analyzer-engine
+
+     O QUE MUDOU
+     15 critérios com pesos (segredos 15, testes 15, tamanho de funções
+     10, complexidade 8, README 7, tipagem 7, lint 6, ...). Critérios que
+     não se aplicam saem do cálculo. Cada melhoria tem 'por quê' e 'como',
+     prioridade, e as mensagens finais são encorajadoras em todas as
+     faixas.
+
+     QUAL PROBLEMA RESOLVE
+     A nota precisa ser justa, explicável e motivadora. Critérios
+     objetivos e transparentes (mostrados no relatório) evitam a sensação
+     de 'nota arbitrária', e o tom foi escrito para incentivar — nunca
+     humilhar.
+
+-------------------------------------------------------------------------------
+#19  feat(analyzer): orquestra o pipeline e gera o relatório em Markdown
+     7f4fc8d · 20/11/2026 14:23 · branch feature/analyzer-engine
+
+     O QUE MUDOU
+     analyzeProject() executa todas as etapas de forma determinística e
+     offline; renderMarkdown() gera o arquivo final com as 4 seções,
+     tabelas, blocos de código com a cerca correta e detalhes recolhíveis.
+
+     QUAL PROBLEMA RESOLVE
+     Junta as peças num único ponto de entrada e produz o arquivo que a
+     pessoa baixa — a 'transcrição' pedida na ideia original.
+
+-------------------------------------------------------------------------------
+#20  test(analyzer): cobre o motor com uma API bancária de exemplo
+     eb7563a · 20/11/2026 14:23 · branch feature/analyzer-engine
+
+     O QUE MUDOU
+     Fixture de uma API bancária (NestJS + Prisma) com transferência
+     atômica e um segredo fixo; testes de domínio, rotas, versões,
+     arquitetura, destaque principal, detecção do segredo sem vazá-lo e
+     presença das 4 seções. Mais testes de manifestos, segredos,
+     normalização e extração de funções (36 no total).
+
+     QUAL PROBLEMA RESOLVE
+     Garante que o motor faz exatamente o exemplo citado na ideia do
+     projeto (entender uma API bancária) e protege contra regressões.
+
+  ↳ 24fc2b9 · 20/11/2026 14:23 · MERGE de feature/analyzer-engine na develop (merge --no-ff)
+
+-------------------------------------------------------------------------------
+#21  fix(analyzer): limpa sintaxe Markdown do título e da descrição do README
+     e8e2529 · 20/11/2026 14:27 · branch feature/analysis-api
+
+     O QUE MUDOU
+     Imagens Markdown viram o texto alternativo, links viram texto, HTML e
+     marcações são removidos.
+
+     QUAL PROBLEMA RESOLVE
+     Bug encontrado ao analisar um repositório real: o nome do projeto
+     apareceu como '![Node/Express/Prisma Example App](project-logo.png)'.
+
+-------------------------------------------------------------------------------
+#22  feat(ingestion): recebe código por .zip e por repositório público do GitHub
+     11dba2a · 20/11/2026 14:27 · branch feature/analysis-api
+
+     O QUE MUDOU
+     zip-extractor.ts: extração em memória com yauzl, contando bytes reais
+     (zip bomb), recusando entradas com ../ (zip slip), ignorando links
+     simbólicos e limitando entradas. github-fetcher.ts: valida
+     dono/repositório com regex, monta a URL de download num host fixo
+     (codeload.github.com), não segue redirects, limita tamanho em
+     streaming e tempo. 16 testes com um zip montado em memória.
+
+     QUAL PROBLEMA RESOLVE
+     Aceitar arquivos e URLs de usuários é das partes mais perigosas de
+     qualquer sistema. Zip bomb derruba o servidor por falta de memória;
+     zip slip pode sobrescrever arquivos; uma URL arbitrária permitiria
+     SSRF (usar o servidor para acessar a rede interna, como
+     169.254.169.254). Cada um desses ataques tem um teste.
+
+-------------------------------------------------------------------------------
+#23  feat(analyses): adiciona schemas e repositório com consultas restritas ao dono
+     0557a93 · 20/11/2026 14:31 · branch feature/analysis-api
+
+     O QUE MUDOU
+     Schemas Zod para colar código (até 100 arquivos / 2 MB), GitHub,
+     upload e listagem; AnalysesRepository em que toda consulta filtra por
+     userId na própria query; paginação por cursor.
+
+     QUAL PROBLEMA RESOLVE
+     Evita IDOR (Insecure Direct Object Reference): trocar o ID na URL não
+     dá acesso à análise de outra pessoa — ela simplesmente 'não existe'
+     (404). A paginação por cursor é estável mesmo com novas análises
+     chegando.
+
+-------------------------------------------------------------------------------
+#24  feat(queue): processa análises em segundo plano com BullMQ e Redis
+     22e28c2 · 20/11/2026 14:31 · branch feature/analysis-api
+
+     O QUE MUDOU
+     AnalysisProcessor (concorrência 2) lê o job, extrai os arquivos, roda
+     o motor e salva o resultado. Erros do usuário não são re-tentados
+     (UnrecoverableError); erros internos têm 2 tentativas com backoff e
+     mensagem genérica. O .zip temporário é sempre apagado. Usa uma
+     instância de ioredis, exigida pelo BullMQ 6 em ESM.
+
+     QUAL PROBLEMA RESOLVE
+     Analisar um repositório grande pode levar segundos; fazer isso dentro
+     da requisição HTTP travaria a API e daria timeout. Com a fila, a API
+     responde 202 na hora. Mensagens genéricas evitam vazar detalhes
+     internos (stack traces) para o usuário.
+
+-------------------------------------------------------------------------------
+#25  feat(analyses): expõe endpoints para colar código, enviar .zip e GitHub
+     03f8a61 · 20/11/2026 14:31 · branch feature/analysis-api
+
+     O QUE MUDOU
+     POST /analyses/paste|upload|github (202), GET /analyses, GET
+     /analyses/:id, GET /analyses/:id/report (download como anexo) e
+     DELETE. Upload via multer em memória com limites, conferência da
+     assinatura binária do zip, nome aleatório no disco, limite de 3
+     análises pendentes por pessoa e body JSON de até 3 MB.
+
+     QUAL PROBLEMA RESOLVE
+     Disponibiliza as três formas de envio pedidas. O relatório é sempre
+     baixado como anexo (Content-Disposition), nunca renderizado pelo
+     navegador — mais uma barreira contra XSS. Não confiar na extensão do
+     arquivo impede que um executável renomeado para .zip seja processado.
+
+-------------------------------------------------------------------------------
+#26  test(analyses): cobre o fluxo assíncrono, isolamento entre usuários e validações
+     7142c84 · 20/11/2026 14:31 · branch feature/analysis-api
+
+     O QUE MUDOU
+     Teste e2e que cola código, espera o worker terminar, baixa o
+     relatório, confirma 404 para outra pessoa (inclusive no DELETE),
+     recusa URL que não é do GitHub e arquivo que não é zip, e exige
+     autenticação.
+
+     QUAL PROBLEMA RESOLVE
+     Prova o fluxo completo (API + fila + banco) e as proteções de
+     autorização num só teste.
+
+  ↳ 82a7016 · 20/11/2026 14:31 · MERGE de feature/analysis-api na develop (merge --no-ff)
+
+-------------------------------------------------------------------------------
+#27  feat(ai): enriquece as explicações com Claude (opcional)
+     47c7c77 · 20/11/2026 14:33 · branch feature/ai-explanations
+
+     O QUE MUDOU
+     AiExplainerService usa o SDK oficial da Anthropic com structured
+     outputs (schema Zod), fallback de modelo no servidor e effort
+     'medium'. Envia só um resumo + trechos já mascarados, delimitados
+     como dados, e aplica limites de tamanho na resposta. Testes de
+     'desligado sem chave', 'não envia segredos' e 'merge sem alterar a
+     nota'.
+
+     QUAL PROBLEMA RESOLVE
+     A análise estática é precisa mas tem frases 'de template'. A IA deixa
+     os textos mais naturais e acrescenta sugestões que regras não
+     percebem. Riscos tratados: prompt injection (o código pode conter
+     'ignore as instruções...'), vazamento de segredos e respostas fora do
+     formato. A nota continua 100% determinística.
+
+-------------------------------------------------------------------------------
+#28  feat(analyses): integra a IA ao worker e expõe /api/meta
+     0de7b06 · 20/11/2026 14:33 · branch feature/ai-explanations
+
+     O QUE MUDOU
+     O worker chama a IA só quando a pessoa pediu e há chave; qualquer
+     falha é registrada e a análise estática é entregue normalmente. GET
+     /api/meta informa se a IA está disponível e os limites.
+
+     QUAL PROBLEMA RESOLVE
+     A IA é um bônus, nunca um ponto único de falha. O /meta permite que o
+     frontend desabilite a opção quando o servidor não tem chave.
+
+  ↳ 06db76c · 20/11/2026 14:33 · MERGE de feature/ai-explanations na develop (merge --no-ff)
+
+-------------------------------------------------------------------------------
+#29  feat(security): adiciona rate limiting por usuário/IP com limites menores no login
+     aee37a7 · 20/11/2026 14:35 · branch feature/security-hardening
+
+     O QUE MUDOU
+     ThrottlerGuard global (100 req/min) registrado depois do guard de
+     autenticação, contando por usuário (ou IP, para anônimos). Login
+     10/min, cadastro 5/min, refresh 30/min, criação de análises 10/min.
+     Health checks fora do limite.
+
+     QUAL PROBLEMA RESOLVE
+     Sem limite, um atacante pode testar milhares de senhas por minuto
+     (força bruta) ou sobrecarregar o servidor com análises. A ordem dos
+     guards importa: contar por usuário evita que pessoas atrás do mesmo
+     IP (empresa, faculdade) se bloqueiem.
+
+-------------------------------------------------------------------------------
+#30  feat(security): aplica Helmet, CORS restrito e Swagger apenas em desenvolvimento
+     5331ad3 · 20/11/2026 14:35 · branch feature/security-hardening
+
+     O QUE MUDOU
+     Helmet (HSTS, nosniff, CSP default-src 'none' em produção), CORS
+     apenas para CORS_ORIGIN com credenciais e métodos mínimos, Swagger em
+     /api/docs só fora de produção. Bloqueia o script de telemetria
+     @scarf/scarf (vem com o Swagger UI) via allowScripts.
+
+     QUAL PROBLEMA RESOLVE
+     Headers de segurança fecham classes inteiras de ataques no navegador;
+     CORS restrito impede que outro site use a sessão da pessoa; não
+     publicar a documentação em produção reduz a superfície de ataque.
+
+-------------------------------------------------------------------------------
+#31  docs(security): documenta ameaças cobertas e como reportar falhas
+     b70080b · 20/11/2026 14:35 · branch feature/security-hardening
+
+     O QUE MUDOU
+     SECURITY.md com a tabela ameaça → proteção e orientações para
+     produção.
+
+     QUAL PROBLEMA RESOLVE
+     Transparência: mostra (inclusive para recrutadores) o que foi pensado
+     em segurança e indica o canal privado para reportar vulnerabilidades.
+
+  ↳ b880b2f · 20/11/2026 14:35 · MERGE de feature/security-hardening na develop (merge --no-ff)
+
+-------------------------------------------------------------------------------
+#32  chore(frontend): cria SPA com React 19, Vite e TypeScript estrito
+     0016a93 · 20/11/2026 14:41 · branch feature/frontend
+
+     O QUE MUDOU
+     Base do frontend com Vite, proxy de /api para a API em
+     desenvolvimento, Vitest + Testing Library, oxlint e sourcemaps
+     desligados em produção.
+
+     QUAL PROBLEMA RESOLVE
+     O proxy faz frontend e API ficarem na mesma origem também em
+     desenvolvimento, para o cookie de refresh funcionar igual à produção.
+     Sem sourcemaps, o código-fonte original não é publicado.
+
+-------------------------------------------------------------------------------
+#33  feat(frontend): adiciona cliente HTTP com renovação de sessão e contexto de auth
+     1bc6856 · 20/11/2026 14:41 · branch feature/frontend
+
+     O QUE MUDOU
+     Cliente fetch com access token só em memória; num 401 faz UMA
+     renovação via cookie (compartilhada entre requisições simultâneas) e
+     repete a chamada. AuthContext restaura a sessão ao abrir o site.
+     Testes do cliente.
+
+     QUAL PROBLEMA RESOLVE
+     Guardar token em localStorage é um erro comum: qualquer XSS o rouba.
+     Em memória + cookie httpOnly é o equilíbrio entre segurança e não
+     obrigar a pessoa a logar a cada 15 minutos.
+
+-------------------------------------------------------------------------------
+#34  style(frontend): cria design system preto e branco, minimalista
+     f655627 · 20/11/2026 14:41 · branch feature/frontend
+
+     O QUE MUDOU
+     Variáveis de cor/tipografia, IBM Plex servida localmente (subset
+     latino), linhas finas, botões quadrados que invertem no hover, foco
+     visível e prefers-reduced-motion.
+
+     QUAL PROBLEMA RESOLVE
+     Atende ao pedido de um visual 'sem cara de IA': nada de gradientes,
+     sombras, brilhos ou cantos arredondados — hierarquia por tipografia e
+     espaço. Fontes locais funcionam com a CSP restrita.
+
+-------------------------------------------------------------------------------
+#35  feat(frontend): adiciona componentes de layout, código, nota e texto seguro
+     8feedd8 · 20/11/2026 14:41 · branch feature/frontend
+
+     O QUE MUDOU
+     Layout, RequireAuth, Status, CodeBlock (numeração real de linhas),
+     ScoreMeter (régua 0–10) e Prose (Markdown sem HTML). Testes,
+     incluindo um que garante que <img onerror> e <script> não são
+     renderizados.
+
+     QUAL PROBLEMA RESOLVE
+     O relatório contém textos derivados do código analisado — que pode
+     ser malicioso. Renderizar só um subconjunto seguro de Markdown impede
+     XSS.
+
+-------------------------------------------------------------------------------
+#36  feat(frontend): cria telas de entrada, painel, nova análise e relatório
+     4b0469b · 20/11/2026 14:41 · branch feature/frontend
+
+     O QUE MUDOU
+     Landing, cadastro/login, painel com atualização automática enquanto
+     há análises pendentes, nova análise (vários arquivos colados, .zip
+     com arrastar-e-soltar, URL do GitHub, opção de IA) e relatório com
+     índice fixo, download e exclusão.
+
+     QUAL PROBLEMA RESOLVE
+     É a experiência completa do produto: enviar, acompanhar e ler o
+     relatório de forma agradável.
+
+  ↳ dea0f6f · 20/11/2026 14:41 · MERGE de feature/frontend na develop (merge --no-ff)
+
+-------------------------------------------------------------------------------
+#37  fix(analyzer): remove repetição entre 'O que faz' e a lista de observações
+     7cbfaaa · 20/11/2026 14:41 · branch fix/report-texts
+
+     O QUE MUDOU
+     O texto 'O que faz' passou a trazer só o objetivo da função.
+
+     QUAL PROBLEMA RESOLVE
+     Encontrado ao revisar o relatório renderizado no navegador: a mesma
+     informação aparecia duas vezes seguidas.
+
+-------------------------------------------------------------------------------
+#38  fix(analyzer): escolhe o parágrafo de introdução correto do README
+     807fbfc · 20/11/2026 14:41 · branch fix/report-texts
+
+     O QUE MUDOU
+     Aproveita citações com título ('> ### ...') e ignora parágrafos que
+     terminam com ':'. Teste de regressão.
+
+     QUAL PROBLEMA RESOLVE
+     Num repositório real, a 'descrição do projeto' saiu como 'Run the
+     following command to install dependencies:'.
+
+  ↳ 1a39e1e · 20/11/2026 14:41 · MERGE de fix/report-texts na develop (merge --no-ff)
+
+-------------------------------------------------------------------------------
+#39  build(backend): adiciona Dockerfile multi-stage com usuário não-root
+     9ff9d9f · 20/11/2026 14:49 · branch chore/docker
+
+     O QUE MUDOU
+     Estágios deps → build → migrate → runtime; a imagem final tem só
+     dependências de produção (instaladas com --ignore-scripts), roda como
+     usuário node e tem healthcheck.
+
+     QUAL PROBLEMA RESOLVE
+     Imagens menores sobem mais rápido e têm menos superfície de ataque.
+     Rodar como root dentro do container é um risco desnecessário caso a
+     aplicação seja comprometida.
+
+-------------------------------------------------------------------------------
+#40  build(frontend): serve o build com Nginx sem privilégios e headers de segurança
+     09efcf2 · 20/11/2026 14:49 · branch chore/docker
+
+     O QUE MUDOU
+     Nginx unprivileged (porta 8080) com CSP, X-Frame-Options, Referrer-
+     Policy, Permissions-Policy, proxy de /api, fallback da SPA, gzip e
+     cache imutável de /assets.
+
+     QUAL PROBLEMA RESOLVE
+     Servir o React com um servidor web de verdade, com headers de
+     segurança, e manter frontend e API na mesma origem (sem CORS, cookie
+     simples).
+
+-------------------------------------------------------------------------------
+#41  build(infra): orquestra Postgres, Redis, migrations, API e web com docker compose
+     9e8666a · 20/11/2026 14:49 · branch chore/docker
+
+     O QUE MUDOU
+     docker-compose.yml com redes separadas, só a porta 8080 exposta,
+     Redis com senha, serviço de migrations antes da API, API com sistema
+     de arquivos somente leitura (tmpfs só para uploads), no-new-
+     privileges e segredos obrigatórios via .env.
+
+     QUAL PROBLEMA RESOLVE
+     'Docker e PostgreSQL para a infra' — com um comando qualquer pessoa
+     sobe o produto inteiro. Banco e Redis inacessíveis de fora e
+     containers endurecidos são o padrão que se espera em produção.
+
+  ↳ c6d1290 · 20/11/2026 14:49 · MERGE de chore/docker na develop (merge --no-ff)
+
+-------------------------------------------------------------------------------
+#42  ci: adiciona pipeline com lint, testes unitários, e2e, build e imagens Docker
+     88fb765 · 20/11/2026 14:49 · branch ci/github-actions
+
+     O QUE MUDOU
+     Workflow com jobs de backend (Postgres e Redis como services),
+     frontend, build das imagens e auditoria de dependências, com
+     permissões mínimas.
+
+     QUAL PROBLEMA RESOLVE
+     Garante que nada quebrado chegue à main/develop: cada push e PR roda
+     toda a bateria de testes automaticamente.
+
+-------------------------------------------------------------------------------
+#43  chore(github): configura Dependabot e template de pull request
+     d01c05c · 20/11/2026 14:49 · branch ci/github-actions
+
+     O QUE MUDOU
+     Atualizações semanais de npm (agrupando NestJS e Prisma) e mensais de
+     Docker e Actions contra a develop; template de PR com checklist.
+
+     QUAL PROBLEMA RESOLVE
+     Dependências desatualizadas acumulam vulnerabilidades; o Dependabot
+     transforma isso em PRs pequenos e revisáveis.
+
+-------------------------------------------------------------------------------
+#44  chore: valida mensagens de commit com Commitlint e Husky
+     4ca4557 · 20/11/2026 14:49 · branch ci/github-actions
+
+     O QUE MUDOU
+     package.json na raiz com Husky e Commitlint (config-conventional);
+     hook commit-msg.
+
+     QUAL PROBLEMA RESOLVE
+     Garante que todo commit futuro siga o padrão Conventional Commits — o
+     histórico continua legível e permite gerar changelogs
+     automaticamente.
+
+  ↳ 9baec33 · 20/11/2026 14:49 · MERGE de ci/github-actions na develop (merge --no-ff)
+
+-------------------------------------------------------------------------------
+#45  fix(frontend): adiciona espaçamento superior na tela de nova análise
+     c016c1a · 20/11/2026 14:50 · branch fix/new-analysis-spacing
+
+     O QUE MUDOU
+     Classe .page-top com padding superior aplicada à tela de nova
+     análise.
+
+     QUAL PROBLEMA RESOLVE
+     Encontrado revisando screenshots: o rótulo da página encostava no
+     cabeçalho.
+
+  ↳ 0c16ead · 20/11/2026 14:50 · MERGE de fix/new-analysis-spacing na develop (merge --no-ff)
+
+-------------------------------------------------------------------------------
+#46  docs: escreve README completo com screenshots e exemplo de relatório
+     branch docs/readme-e-historia
+
+     O QUE MUDOU: README com sumário, telas, como rodar com Docker (3
+     comandos) e em modo desenvolvimento, tecnologias e motivos,
+     arquitetura (diagrama), funcionamento do motor, critérios da nota,
+     endpoints, variáveis de ambiente, segurança, testes, padrão de
+     commits e estrutura de pastas; screenshots em docs/imagens e um
+     relatório real em docs/exemplo-de-relatorio.md.
+
+     QUAL PROBLEMA RESOLVE: um projeto sem documentação não é usado. O
+     README foi escrito para que qualquer pessoa — inclusive quem nunca
+     usou Docker — consiga rodar o projeto, e para que recrutadores
+     entendam rapidamente o que foi construído.
+
+-------------------------------------------------------------------------------
+#47  docs: registra a história do projeto e explica cada commit
+     branch docs/readme-e-historia
+
+     O QUE MUDOU: docs/HISTORIA_DO_PROJETO.txt (da ideia ao produto,
+     decisões e problemas resolvidos) e este arquivo. Como um commit não
+     consegue conter o próprio hash, este e o anterior aparecem sem hash
+     aqui — use 'git log' para vê-los.
+
+-------------------------------------------------------------------------------
+RELEASE  Merge da develop na main + tag v1.0.0
+
+     A main recebe apenas versões estáveis. O merge --no-ff da develop na
+     main marca a primeira versão completa do produto, identificada pela
+     tag anotada v1.0.0.
+
+===============================================================================

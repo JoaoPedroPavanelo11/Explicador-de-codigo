@@ -1,0 +1,95 @@
+// Schema do banco de dados do Explicador de Código.
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String         @id @default(uuid()) @db.Uuid
+  email         String         @unique @db.VarChar(254)
+  name          String         @db.VarChar(80)
+  // Nunca guardamos a senha, apenas o hash (scrypt) dela.
+  passwordHash  String         @map("password_hash")
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+  analyses      Analysis[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+enum SourceType {
+  PASTE
+  ZIP
+  GITHUB
+}
+
+enum AnalysisStatus {
+  QUEUED
+  PROCESSING
+  DONE
+  FAILED
+}
+
+model Analysis {
+  id           String         @id @default(uuid()) @db.Uuid
+  userId       String         @map("user_id") @db.Uuid
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String         @db.VarChar(120)
+  sourceType   SourceType     @map("source_type")
+  // Ex.: URL do GitHub ou nome do .zip. O código-fonte em si NÃO é guardado.
+  sourceRef    String?        @map("source_ref") @db.VarChar(300)
+  status       AnalysisStatus @default(QUEUED)
+  useAi        Boolean        @default(false) @map("use_ai")
+  aiEnhanced   Boolean        @default(false) @map("ai_enhanced")
+  score        Decimal?       @db.Decimal(3, 1)
+  fileCount    Int?           @map("file_count")
+  lineCount    Int?           @map("line_count")
+  // Resultado estruturado (ideia, stack, destaques, nota) em JSON.
+  result       Json?
+  // O relatório final em Markdown, pronto para download.
+  reportMd     String?        @map("report_md")
+  errorMessage String?        @map("error_message") @db.VarChar(500)
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+  finishedAt   DateTime?      @map("finished_at") @db.Timestamptz
+
+  // Listagem do usuário ordenada por data é a consulta mais comum.
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("analyses")
+}
+
+// ---------------------------------------------------------------------------
+// Refresh tokens (rotação + detecção de reuso).
+// Guardamos apenas o SHA-256 do token, nunca o token em si.
+// ---------------------------------------------------------------------------
+model RefreshToken {
+  id              String    @id @db.VarChar(128) // SHA-256 do token
+  familyId        String    @map("family_id") @db.VarChar(128)
+  userId          String    @map("user_id") @db.Uuid
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @map("created_at") @db.Timestamptz
+  expiresAt       DateTime  @map("expires_at") @db.Timestamptz
+  familyExpiresAt DateTime  @map("family_expires_at") @db.Timestamptz
+  usedAt          DateTime? @map("used_at") @db.Timestamptz
+  claims          Json?
+
+  @@index([familyId])
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// Famílias revogadas (logout ou token roubado detectado). Continua valendo
+// para tokens da mesma família salvos depois da revogação.
+model RevokedTokenFamily {
+  familyId  String   @id @map("family_id") @db.VarChar(128)
+  revokedAt DateTime @default(now()) @map("revoked_at") @db.Timestamptz
+
+  @@map("revoked_token_families")
+}

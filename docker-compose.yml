@@ -1,0 +1,107 @@
+# Sobe o projeto inteiro: banco, fila, migrations, API e frontend.
+#   cp .env.example .env   (e troque os segredos)
+#   docker compose up -d --build
+# Acesse http://localhost:8080
+
+name: explicador-de-codigo
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: explicador
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: explicador
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U explicador -d explicador"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [backend]
+    # Sem "ports": o banco NÃO fica acessível de fora da rede do Docker.
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?defina REDIS_PASSWORD no .env}"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    networks: [backend]
+
+  # Aplica as migrations do Prisma e encerra. A API só sobe depois disso.
+  migrate:
+    build:
+      context: ./backend
+      target: migrate
+    environment:
+      DATABASE_URL: postgresql://explicador:${POSTGRES_PASSWORD}@postgres:5432/explicador?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+    restart: "no"
+
+  api:
+    build:
+      context: ./backend
+      target: runtime
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      CORS_ORIGIN: ${PUBLIC_URL:-http://localhost:8080}
+      DATABASE_URL: postgresql://explicador:${POSTGRES_PASSWORD}@postgres:5432/explicador?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env (mínimo 32 caracteres)}
+      JWT_TTL: 15m
+      REFRESH_TTL: 7d
+      UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-10}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-claude-opus-5-5}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    read_only: true            # sistema de arquivos somente leitura...
+    tmpfs:
+      - /app/tmp:uid=1000,gid=1000,mode=0700   # ...exceto a pasta de uploads temporários
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    networks: [backend, frontend]
+
+  web:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:8080"   # a ÚNICA porta exposta
+    depends_on:
+      api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    networks: [frontend]
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  backend:
+  frontend:
