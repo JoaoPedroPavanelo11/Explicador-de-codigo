@@ -133,7 +133,17 @@ export interface AnalysisMeta {
   skippedFiles: number;
 }
 
+/** Presente apenas quando o modo IA foi usado com sucesso. */
+export interface AiInsights {
+  model: string;
+  /** Recado final de mentor, em tom encorajador. */
+  mentorNote: string;
+  /** Sugestões extras que a análise estática não consegue perceber. */
+  extraSuggestions: string[];
+}
+
 export interface AnalysisResult {
+  ai?: AiInsights;
   idea: IdeaSection;
   stack: StackSection;
   highlights: Highlight[];
