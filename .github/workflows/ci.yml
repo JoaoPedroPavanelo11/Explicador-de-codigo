@@ -45,7 +45,7 @@ jobs:
       REDIS_PORT: 6379
       JWT_SECRET: ci-segredo-apenas-para-testes-com-mais-de-32-chars
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -65,7 +65,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [backend, frontend]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build da API
         run: docker build --target runtime -t explicador-api ./backend
       - name: Build do frontend
@@ -93,7 +93,7 @@ jobs:
     # Não bloqueia o merge, mas deixa vulnerabilidades altas visíveis no PR.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 24
