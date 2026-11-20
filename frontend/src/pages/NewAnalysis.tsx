@@ -84,7 +84,7 @@ export function NewAnalysis() {
     setFiles((prev) => prev.map((f, j) => (j === i ? { ...f, ...patch } : f)))
 
   return (
-    <div className="page">
+    <div className="page page-top">
       <p className="label">Nova análise</p>
       <h1 className="page-title">O que vamos ler hoje?</h1>
 

@@ -27,6 +27,10 @@
   flex-wrap: wrap;
 }
 
+.page-top {
+  padding-top: 56px;
+}
+
 .narrow {
   max-width: 460px;
   padding-top: 72px;
