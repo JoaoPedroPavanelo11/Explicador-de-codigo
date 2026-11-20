@@ -1,0 +1,419 @@
+===============================================================================
+                  EXPLICADOR DE CÓDIGO — HISTÓRIA DO PROJETO
+                     Da ideia ao produto, passo a passo
+===============================================================================
+
+Este documento conta como o projeto nasceu, quais decisões foram tomadas (e
+por quê), os problemas que apareceram no caminho e como cada um foi
+resolvido. No final há um resumo dos commits — a explicação detalhada de
+cada commit está em docs/COMMITS_EXPLICADOS.txt.
+
+
+-------------------------------------------------------------------------------
+1. A IDEIA
+-------------------------------------------------------------------------------
+
+O ponto de partida foi uma observação simples: com a IA, ficou muito fácil
+GERAR código — e continua difícil ENTENDER se esse código é bom, seguro e
+fácil de manter. Programadores júniores, em especial, recebem projetos
+prontos (de colegas, de tutoriais ou de uma IA) e não sabem por onde começar
+a ler.
+
+A proposta: um "leitor de código" que funciona com QUALQUER projeto (meu ou
+de outra pessoa) e entrega um relatório dividido em quatro partes:
+
+  1. A IDEIA DO CÓDIGO — o que é, que problema resolve e para quem serve.
+     Ex.: se alguém fez uma API bancária, o relatório deve dizer isso e
+     explicar quem usaria aquilo.
+
+  2. A STACK — tecnologias e versões, como as pastas estão organizadas e o
+     PROVÁVEL MOTIVO de cada escolha.
+
+  3. OS PONTOS IMPORTANTES — destacar trechos como "a service de usuários",
+     mostrar o código e explicar o que ele faz e o que há de interessante.
+
+  4. A NOTA — uma nota geral com explicação do que pode melhorar, em tom
+     construtivo: o objetivo é motivar as pessoas a escreverem código
+     melhor e mais confiável, nunca humilhar ninguém.
+
+Objetivos pessoais do projeto:
+  - Agregar ao currículo, mostrando domínio de tecnologias de mercado.
+  - Ser útil de verdade, principalmente na "era da IA".
+  - Ser seguro desde o início (segurança não como "fase final").
+  - Ter um frontend minimalista preto e branco, sem "cara de IA".
+
+
+-------------------------------------------------------------------------------
+2. REQUISITOS QUE GUIARAM AS DECISÕES
+-------------------------------------------------------------------------------
+
+  - Tecnologia conhecida: Node.js com NestJS.
+  - Docker e PostgreSQL obrigatórios (infra e banco).
+  - Tecnologias "interessantes para um júnior" mostrar no portfólio.
+  - README explicado para qualquer pessoa conseguir usar.
+  - Padrão de commits de mercado (Conventional Commits) e sem commitar tudo
+    na main (fluxo de branches).
+  - Construções de segurança viáveis em todas as etapas.
+
+
+-------------------------------------------------------------------------------
+3. A GRANDE DECISÃO: COMO "LER" CÓDIGO?
+-------------------------------------------------------------------------------
+
+Havia dois caminhos:
+
+  (a) Mandar tudo para uma IA e pedir a explicação.
+  (b) Criar um MÉTODO próprio de análise estática.
+
+Escolhemos (b) como base e (a) como complemento opcional. Motivos:
+
+  - Determinismo: a mesma entrada gera sempre o mesmo resultado. Uma nota que
+    muda a cada execução não é justa.
+  - Funciona offline e de graça: sem chave de API, o produto continua
+    completo.
+  - Privacidade: o código não precisa sair do servidor.
+  - Aprendizado: construir o método é o que mostra conhecimento técnico de
+    verdade no portfólio.
+
+O MÉTODO criado (backend/src/analyzer/engine) funciona como um pipeline:
+
+  arquivos → normalização → manifestos → stack → arquitetura → ideia
+           → extração de funções → destaques → segredos → nota → relatório
+
+  * Manifestos: em vez de "adivinhar" a stack, lemos os arquivos que
+    DECLARAM as dependências (package.json, requirements.txt, pom.xml,
+    go.mod, Cargo.toml, composer.json, Gemfile, .csproj, Dockerfile,
+    docker-compose, schema.prisma...). Daí saem nomes e versões exatas.
+
+  * Catálogo de conhecimento: cada pacote conhecido (≈120) tem uma
+    descrição simples e o "provável motivo de escolha". Ex.: Prisma →
+    "consultas com autocomplete e segurança de tipos". É assim que o
+    relatório explica o PORQUÊ, e não só o QUÊ.
+
+  * Imports: quando a pessoa cola só um trecho (sem package.json), os
+    imports revelam as bibliotecas.
+
+  * Arquitetura: regras sobre nomes de pastas e arquivos (controllers/ +
+    services/ → camadas; *.module.ts → modular do Nest; domain/ +
+    infrastructure/ → Clean Architecture; etc.), sempre com evidências.
+
+  * Ideia e domínio: um vocabulário de 18 domínios de negócio (bancário,
+    e-commerce, saúde, educação...) com palavras em português e inglês.
+    Pontuamos a frequência dessas palavras em caminhos de arquivos, nomes
+    de classes/funções, rotas HTTP e README. O domínio vencedor (acima de um
+    limite mínimo) vira "do domínio bancário", e cada domínio já traz o seu
+    "para quem serve".
+
+  * Rotas: extraídas de 10+ frameworks (Nest, Express, Fastify, FastAPI,
+    Flask, Django, Spring, ASP.NET, Laravel, Go).
+
+  * Destaques: cada arquivo recebe um papel (service, controller,
+    repository, guard, componente...). Escolhemos a função mais
+    "explicável" de cada arquivo importante, pontuando padrões didáticos
+    (transação de banco, guard clauses, injeção de dependência, decimal
+    para dinheiro, validação de entrada...). Cada padrão encontrado vira
+    uma explicação e, quando faz sentido, um "o que achei interessante".
+
+  * Nota: 15 critérios objetivos com pesos (segredos expostos, testes,
+    tamanho de funções, complexidade, README, tipagem, lint, validação,
+    CI, Docker...). Critérios que não se aplicam saem da conta — um trecho
+    de 10 linhas não perde ponto por "não ter CI".
+
+  * IA (opcional): com ANTHROPIC_API_KEY, o Claude reescreve os textos
+    (resumo, público e explicações dos trechos) usando structured outputs.
+    A NOTA NÃO MUDA — ela vem só da análise estática.
+
+
+-------------------------------------------------------------------------------
+4. ESCOLHA DA STACK (E POR QUÊ)
+-------------------------------------------------------------------------------
+
+  Backend
+    - NestJS 12 (ESM, Vitest, oxlint): organização modular e injeção de
+      dependência, muito pedidos no mercado.
+    - PostgreSQL 16 + Prisma 7: banco relacional confiável, schema
+      declarativo e migrations versionadas.
+    - Redis + BullMQ: análises de projetos grandes podem demorar; a fila
+      tira esse trabalho da requisição HTTP (resposta 202 imediata).
+    - @nestjs/authentication: autenticação oficial do Nest, evitando montar
+      login "na mão" (e os erros clássicos que vêm junto).
+    - Zod: validação + tipos com um único schema.
+    - Helmet, Throttler, Swagger, Terminus.
+
+  Frontend
+    - React 19 + Vite + TypeScript estrito.
+    - TanStack Query para cache e polling do status.
+    - react-markdown (sem HTML) para renderizar textos com segurança.
+    - CSS próprio (design system) em vez de biblioteca de componentes:
+      era a única forma de ter um visual realmente autoral.
+
+  Infra
+    - Docker multi-stage, Nginx unprivileged, docker compose.
+    - GitHub Actions, Dependabot, Husky + Commitlint.
+
+
+-------------------------------------------------------------------------------
+5. A CONSTRUÇÃO, ETAPA POR ETAPA
+-------------------------------------------------------------------------------
+
+Cada etapa foi feita numa branch própria e integrada na develop com merge
+--no-ff. Nenhuma funcionalidade foi commitada direto na main.
+
+  ETAPA 1 — Base do repositório (main)
+    .gitignore, .editorconfig, .gitattributes, licença MIT e README inicial.
+    Logo em seguida foi criada a branch develop.
+
+  ETAPA 2 — feature/backend-setup
+    Projeto Nest 12 gerado com o CLI oficial. Removemos o módulo de
+    telemetria que vem por padrão (o projeto não deve mandar dados a
+    terceiros). Variáveis de ambiente validadas com Zod: a API se recusa a
+    subir sem DATABASE_URL ou com JWT_SECRET curto.
+
+  ETAPA 3 — feature/database
+    Tabelas users e analyses, enums de status/origem, índice para a
+    listagem por usuário, readiness check (/api/ready) e um
+    docker-compose.dev.yml com Postgres e Redis expostos só em 127.0.0.1.
+    Decisão importante: O CÓDIGO ANALISADO NÃO É SALVO — só o relatório.
+
+  ETAPA 4 — feature/auth
+    Cadastro, login, JWT de 15 minutos e refresh token rotativo em cookie
+    httpOnly. Implementamos nosso próprio store de refresh tokens no
+    Postgres (guardando só o SHA-256). Reutilizar um refresh token antigo
+    revoga a "família" inteira — se alguém roubou o token, os dois lados
+    perdem a sessão. Teste e2e cobrindo todo o fluxo.
+
+  ETAPA 5 — feature/analyzer-engine
+    O motor de análise inteiro (seção 3), com testes unitários e uma
+    fixture: uma API bancária fictícia em NestJS com uma transferência
+    atômica e um segredo "esquecido" no código.
+
+  ETAPA 6 — feature/analysis-api
+    Ingestão segura (.zip e GitHub), fila BullMQ, endpoints de análise e
+    download do relatório. Testes e2e do fluxo assíncrono.
+
+  ETAPA 7 — feature/ai-explanations
+    Integração opcional com o Claude, com defesa contra prompt injection e
+    sem nunca derrubar a análise se a IA falhar.
+
+  ETAPA 8 — feature/security-hardening
+    Rate limiting, Helmet, CORS restrito, Swagger só em desenvolvimento e
+    o SECURITY.md.
+
+  ETAPA 9 — feature/frontend
+    SPA preta e branca: landing, cadastro/login, painel, nova análise
+    (colar / .zip / GitHub) e o relatório com índice fixo e download.
+
+  ETAPA 10 — fix/report-texts e fix/new-analysis-spacing
+    Correções encontradas ao revisar o produto rodando (detalhes abaixo).
+
+  ETAPA 11 — chore/docker
+    Dockerfiles multi-stage, Nginx com CSP, compose completo.
+
+  ETAPA 12 — ci/github-actions
+    Pipeline de CI, Dependabot, template de PR, Commitlint + Husky.
+
+  ETAPA 13 — docs/readme-e-historia
+    README completo, screenshots, exemplo de relatório e estes arquivos.
+
+  RELEASE — develop → main com a tag v1.0.0.
+
+
+-------------------------------------------------------------------------------
+6. PROBLEMAS ENCONTRADOS E COMO FORAM RESOLVIDOS
+-------------------------------------------------------------------------------
+
+  6.1  npm 10 quebrava ao instalar ("Cannot read properties of null
+       (reading 'edgesOut')")
+       Causa: bug do npm 10 com dependências opcionais do Vitest 4.
+       Solução: usar npm 11 (documentado no README como pré-requisito).
+       Bônus: o npm 11 trouxe o "allowScripts", que passamos a usar como
+       medida de segurança contra pacotes maliciosos.
+
+  6.2  Pacotes com scripts de instalação
+       O npm 11 avisou que alguns pacotes queriam rodar scripts ao instalar.
+       Aprovamos apenas o Prisma (precisa baixar seus binários) e negamos o
+       msgpackr-extract (opcional) e o @scarf/scarf (telemetria que vem
+       junto do Swagger UI).
+
+  6.3  Prisma 7 mudou o jeito de configurar
+       O Prisma 7 não lê mais o .env sozinho e exige um "driver adapter".
+       Criamos o prisma.config.ts (com dotenv) e usamos @prisma/adapter-pg.
+
+  6.4  O motor achou que o próprio projeto era "um jogo do domínio bancário"
+       Ao testar o explicador nele mesmo, ele leu as FIXTURES de teste (a
+       API bancária de exemplo) e as palavras-chave do próprio catálogo. Um
+       teste ótimo, porque mostrou um problema real: arquivos de teste,
+       fixtures e mocks não representam o produto.
+       Solução: a função isAuxiliaryPath() exclui testes, fixtures, mocks,
+       exemplos, migrations e código gerado da detecção de ideia, rotas,
+       destaques e segredos. A detecção de "jogo Unity" também passou a
+       exigir um arquivo .cs com ": MonoBehaviour", e as rotas passaram a
+       ignorar linhas de comentário.
+
+  6.5  pyproject.toml lido errado
+       O teste com "sqlalchemy[asyncio]==2.0.30" falhou: a regex parava no
+       "]" do extra. A regex passou a entender strings com colchetes.
+
+  6.6  O yauzl recusou um zip com "../" e o teste falhou
+       Era o comportamento CERTO: um zip com caminho "../../etc/passwd" é um
+       ataque (zip slip). Em vez de "contornar", passamos a recusar o .zip
+       inteiro com uma mensagem clara e ajustamos o teste.
+
+  6.7  "JavaScript heap out of memory" num teste
+       Parecia um bug grave do motor. Investigando, a causa era o próprio
+       comando de teste (Vitest rodando com --root /, varrendo o disco
+       inteiro). Rodando corretamente, o repositório real (60 arquivos) foi
+       analisado em ~380 ms. Lição: isolar a etapa antes de concluir.
+
+  6.8  README com imagem no título
+       No repositório real "node-express-realworld-example-app", o nome do
+       projeto saiu como "![Node/Express/Prisma Example App](logo.png)".
+       Solução: limpar sintaxe Markdown (imagem vira o texto alternativo).
+
+  6.9  A descrição do README pegou "Run the following command..."
+       A introdução estava dentro de uma citação com título ("> ### ...").
+       Solução: aproveitar citações com título e ignorar parágrafos que
+       terminam com ":" (instruções). Ganhou teste de regressão.
+
+  6.10 BullMQ 6 não conectava no Redis
+       Em projetos ESM, o BullMQ 6 exige o pacote ioredis instalado e uma
+       INSTÂNCIA já criada do cliente, em vez de host/porta.
+
+  6.11 Texto "O que faz" repetido
+       Ao ver o relatório renderizado, a explicação repetia as observações
+       da lista logo abaixo. Ficou só o objetivo da função.
+
+  6.12 Espaçamento na tela "Nova análise"
+       Encontrado ao revisar screenshots: o título encostava no cabeçalho.
+
+  6.13 Docker no ambiente de desenvolvimento em nuvem
+       No ambiente usado para construir o projeto, o build das imagens
+       falhava por causa de um proxy corporativo com certificado próprio.
+       Isso é específico daquele ambiente; os Dockerfiles do projeto não
+       foram alterados por causa disso (o build foi validado com uma cópia
+       temporária que confiava no certificado).
+
+
+-------------------------------------------------------------------------------
+7. COMO O PRODUTO FOI VALIDADO
+-------------------------------------------------------------------------------
+
+  - 56 testes unitários no backend (motor, ingestão, IA, configuração).
+  - 6 testes e2e com Postgres e Redis reais (auth e análises).
+  - 6 testes no frontend (componentes, proteção contra XSS e cliente HTTP).
+  - Testes manuais com curl: isolamento entre usuários (404), SSRF
+    bloqueado, zip falso recusado, força bruta barrada (429), headers de
+    segurança, CORS para origem maliciosa.
+  - Teste num repositório público real (RealWorld / clone do Medium):
+    identificado corretamente como "API / backend do domínio rede social /
+    conteúdo", com Express, Prisma, PostgreSQL, JWT, bcrypt e versões.
+  - Navegador automatizado (Playwright): cadastro, nova análise, relatório,
+    recarregar a página mantendo a sessão, layout no celular (390 px) sem
+    rolagem horizontal e zero erros de CSP no ambiente Docker.
+  - Stack Docker completa: todos os serviços "healthy", migrations
+    aplicadas, API rodando como usuário não-root com sistema de arquivos
+    somente leitura.
+
+  Limitação conhecida da validação: o modo IA foi coberto por testes
+  unitários e compila contra os tipos oficiais do SDK, mas não foi
+  chamado contra a API real durante a construção (não havia chave de API
+  no ambiente). Basta definir ANTHROPIC_API_KEY para ativá-lo.
+
+
+-------------------------------------------------------------------------------
+8. LIÇÕES APRENDIDAS
+-------------------------------------------------------------------------------
+
+  - Testar a ferramenta nela mesma ("dogfooding") revelou os bugs mais
+    interessantes do motor.
+  - Segurança é mais barata quando nasce junto com a funcionalidade: cada
+    feature já entrou com suas proteções e testes.
+  - Quando a biblioteca "quebra" um teste, às vezes ela está certa (zip
+    slip). Entender antes de contornar.
+  - Versões novas (Nest 12, Prisma 7, BullMQ 6, TypeScript 6/7) mudam
+    APIs. Ler a documentação da versão instalada evita horas de erro.
+
+
+-------------------------------------------------------------------------------
+9. RESUMO DOS COMMITS POR BRANCH
+-------------------------------------------------------------------------------
+
+  main
+    chore: inicializa repositório com arquivos base
+
+  feature/backend-setup
+    chore(backend): cria projeto NestJS 12 com Vitest e oxlint
+    feat(config): valida variáveis de ambiente com Zod na inicialização
+    feat(health): adiciona endpoint de liveness e bootstrap seguro
+
+  feature/database
+    chore(infra): adiciona docker compose de desenvolvimento
+    feat(database): modela usuários e análises com Prisma 7
+    feat(health): adiciona readiness check do banco de dados
+
+  feature/auth
+    feat(users): adiciona repositório de usuários sem expor o hash da senha
+    feat(auth): implementa cadastro, login e JWT com refresh token rotativo
+    test(auth): cobre fluxo de autenticação ponta a ponta
+
+  feature/analyzer-engine
+    feat(analyzer): adiciona tipos, linguagens e normalização segura de arquivos
+    feat(analyzer): detecta stack e versões a partir de manifestos e imports
+    feat(analyzer): identifica padrões de arquitetura e monta árvore de pastas
+    feat(analyzer): deduz a ideia, o domínio e o público do projeto
+    feat(analyzer): extrai funções e mede complexidade e aninhamento
+    feat(security): detecta segredos expostos e mascara trechos do relatório
+    feat(analyzer): seleciona e explica os trechos mais importantes
+    feat(analyzer): calcula nota de 0 a 10 com sugestões construtivas
+    feat(analyzer): orquestra o pipeline e gera o relatório em Markdown
+    test(analyzer): cobre o motor com uma API bancária de exemplo
+
+  feature/analysis-api
+    fix(analyzer): limpa sintaxe Markdown do título e da descrição do README
+    feat(ingestion): recebe código por .zip e por repositório público do GitHub
+    feat(analyses): adiciona schemas e repositório com consultas restritas ao dono
+    feat(queue): processa análises em segundo plano com BullMQ e Redis
+    feat(analyses): expõe endpoints para colar código, enviar .zip e GitHub
+    test(analyses): cobre o fluxo assíncrono, isolamento entre usuários e validações
+
+  feature/ai-explanations
+    feat(ai): enriquece as explicações com Claude (opcional)
+    feat(analyses): integra a IA ao worker e expõe /api/meta
+
+  feature/security-hardening
+    feat(security): adiciona rate limiting por usuário/IP com limites menores no login
+    feat(security): aplica Helmet, CORS restrito e Swagger apenas em desenvolvimento
+    docs(security): documenta ameaças cobertas e como reportar falhas
+
+  feature/frontend
+    chore(frontend): cria SPA com React 19, Vite e TypeScript estrito
+    feat(frontend): adiciona cliente HTTP com renovação de sessão e contexto de auth
+    style(frontend): cria design system preto e branco, minimalista
+    feat(frontend): adiciona componentes de layout, código, nota e texto seguro
+    feat(frontend): cria telas de entrada, painel, nova análise e relatório
+
+  fix/report-texts
+    fix(analyzer): remove repetição entre 'O que faz' e a lista de observações
+    fix(analyzer): escolhe o parágrafo de introdução correto do README
+
+  chore/docker
+    build(backend): adiciona Dockerfile multi-stage com usuário não-root
+    build(frontend): serve o build com Nginx sem privilégios e headers de segurança
+    build(infra): orquestra Postgres, Redis, migrations, API e web com docker compose
+
+  ci/github-actions
+    ci: adiciona pipeline com lint, testes unitários, e2e, build e imagens Docker
+    chore(github): configura Dependabot e template de pull request
+    chore: valida mensagens de commit com Commitlint e Husky
+
+  fix/new-analysis-spacing
+    fix(frontend): adiciona espaçamento superior na tela de nova análise
+
+  docs/readme-e-historia
+    docs: escreve README completo com screenshots e exemplo de relatório
+    docs: registra a história do projeto e explica cada commit
+
+  release (develop → main)
+    Merge com a tag v1.0.0
+
+===============================================================================
