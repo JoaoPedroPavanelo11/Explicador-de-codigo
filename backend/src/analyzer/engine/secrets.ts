@@ -5,7 +5,7 @@ export interface SecretFinding {
   file: string;
   line: number;
   kind: string;
-  /** Prévia mascarada — o valor real NUNCA é guardado nem exibido. */
+  // já mascarado, o valor real não é guardado
   preview: string;
 }
 
@@ -35,11 +35,9 @@ const PATTERNS: { kind: string; re: RegExp }[] = [
   },
 ];
 
-/** Valores claramente de exemplo não contam como vazamento. */
 const PLACEHOLDER =
   /(example|exemplo|changeme|change-me|troque|your[_-]|seu[_-]|xxx|\*\*\*|<.+>|\$\{|process\.env|os\.environ|getenv|dummy|placeholder|sample|fake|test|localhost|123456|password$|senha$)/i;
 
-/** Arquivos onde exemplos de credenciais são esperados. */
 function shouldSkip(path: string): boolean {
   const name = basename(path).toLowerCase();
   return (
@@ -79,7 +77,7 @@ export function findSecrets(files: SourceFile[]): SecretFinding[] {
           });
         }
       }
-      // Um arquivo .env versionado é um problema por si só.
+      // .env commitado
       if (
         isEnvFile &&
         /^\s*[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD|PASS)[A-Z0-9_]*\s*=\s*\S{6,}/.test(
@@ -97,7 +95,6 @@ export function findSecrets(files: SourceFile[]): SecretFinding[] {
       }
     });
   }
-  // Remove duplicatas na mesma linha.
   const seen = new Set<string>();
   return findings.filter((f) => {
     const k = `${f.file}:${f.line}`;
@@ -107,10 +104,7 @@ export function findSecrets(files: SourceFile[]): SecretFinding[] {
   });
 }
 
-/**
- * Mascara segredos dentro de um trecho de código antes de exibi-lo no
- * relatório ou enviá-lo para a IA.
- */
+// usado antes de mostrar trecho no relatório e antes de mandar para a IA
 export function redactSecrets(code: string): string {
   let out = code;
   for (const { re } of PATTERNS) {

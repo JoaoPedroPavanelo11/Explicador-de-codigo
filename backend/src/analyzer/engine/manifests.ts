@@ -1,9 +1,8 @@
 import { basename } from './languages.js';
 import type { SourceFile, Technology } from './types.js';
 
-/** Um pacote declarado em algum manifesto (package.json, pom.xml...). */
 export interface DeclaredPackage {
-  /** "<ecossistema>:<nome>", ex.: npm:express */
+  // ex.: npm:express
   key: string;
   version?: string;
   source: string;
@@ -14,7 +13,7 @@ export interface ManifestInfo {
   packages: DeclaredPackage[];
   projectName?: string;
   description?: string;
-  /** Linguagens/runtimes com versão (Node 20, Java 21...) e ferramentas de infra. */
+  // runtimes com versão e ferramentas de infra
   extras: Technology[];
   hasBinField: boolean;
   hasLibraryExports: boolean;
@@ -48,7 +47,7 @@ export function parseManifests(files: SourceFile[]): ManifestInfo {
     hasBinField: false,
     hasLibraryExports: false,
   };
-  // Manifestos mais próximos da raiz definem nome/descrição do projeto.
+  // o manifesto mais perto da raiz define nome e descrição
   const sorted = [...files].sort((a, b) => depth(a.path) - depth(b.path));
   const add = (
     key: string,
@@ -127,7 +126,7 @@ export function parseManifests(files: SourceFile[]): ManifestInfo {
       if (desc && !info.description) info.description = desc[1];
       const pname = c.match(/^name\s*=\s*"([^"]+)"/m);
       if (pname && !info.projectName) info.projectName = pname[1];
-      // PEP 621: dependencies = ["fastapi>=0.110", ...]
+      // PEP 621
       const sections = c.split(/^\[/m);
       const arrays = sections.flatMap((s) => {
         if (s.startsWith('project]'))
@@ -144,7 +143,7 @@ export function parseManifests(files: SourceFile[]): ManifestInfo {
         ))
           add(`pypi:${m[1].toLowerCase()}`, m[2], file.path);
       }
-      // Poetry: [tool.poetry.dependencies] fastapi = "^0.110"
+      // poetry
       for (const section of c
         .split(/^\[/m)
         .filter((s) =>

@@ -2,11 +2,9 @@ import yauzl from 'yauzl';
 import { IngestError, normalizePath } from '../analyzer/engine/normalize.js';
 
 export interface ZipLimits {
-  /** Máximo de entradas no zip (arquivos + pastas). */
   maxEntries: number;
-  /** Máximo de bytes DESCOMPACTADOS somando todos os arquivos lidos. */
+  // descompactado, somando tudo
   maxTotalBytes: number;
-  /** Máximo de bytes descompactados por arquivo. */
   maxFileBytes: number;
 }
 
@@ -15,7 +13,7 @@ export interface RawFile {
   content: Buffer;
 }
 
-/** Assinatura de arquivos zip: "PK\x03\x04" (ou "PK\x05\x06" para zip vazio). */
+// PK\x03\x04, ou PK\x05\x06 em zip vazio
 export function isZip(buf: Buffer): boolean {
   return (
     buf.length >= 4 &&
@@ -26,17 +24,8 @@ export function isZip(buf: Buffer): boolean {
   );
 }
 
-/**
- * Extrai um .zip em memória com várias proteções:
- *
- * - **Zip bomb**: um zip de 1 MB pode virar 10 GB. Não confiamos no tamanho
- *   declarado no cabeçalho (pode ser falso): contamos os bytes de verdade
- *   enquanto descompactamos e abortamos ao passar do limite.
- * - **Zip slip / path traversal**: nomes como "../../etc/passwd" são
- *   descartados por normalizePath(); nada é escrito em disco.
- * - **Links simbólicos** são ignorados.
- * - **Muitas entradas**: limite de quantidade antes de começar a ler.
- */
+// Extrai em memória. O tamanho declarado no cabeçalho não é confiável (zip bomb),
+// então os bytes são contados durante a descompactação. Symlinks são ignorados.
 export async function extractZip(
   buffer: Buffer,
   limits: ZipLimits,
@@ -73,7 +62,7 @@ export async function extractZip(
     const fail = (err: Error) => {
       zip.close();
       if (err instanceof IngestError) return reject(err);
-      // O yauzl recusa nomes com "../" ou caminhos absolutos (zip slip).
+      // o yauzl já recusa "../" e caminho absoluto (zip slip)
       if (/relative path|absolute path|invalid characters/i.test(err.message))
         return reject(
           new IngestError(
@@ -87,7 +76,7 @@ export async function extractZip(
     zip.on('end', () => resolve({ files, skipped }));
     zip.on('entry', (entry: yauzl.Entry) => {
       const isDir = entry.fileName.endsWith('/');
-      // Bits de modo Unix ficam nos 16 bits altos: 0o120000 = link simbólico.
+      // modo unix nos 16 bits altos; 0o120000 = symlink
       const mode = (entry.externalFileAttributes >>> 16) & 0o170000;
       const path = normalizePath(entry.fileName);
       if (
@@ -130,10 +119,7 @@ export async function extractZip(
   });
 }
 
-/**
- * Zips do GitHub (e muitos outros) colocam tudo dentro de uma pasta raiz
- * ("repo-main/src/..."). Removemos essa pasta para os caminhos ficarem limpos.
- */
+// repo-main/src/x.ts -> src/x.ts
 export function stripCommonRoot(files: RawFile[]): RawFile[] {
   if (files.length === 0) return files;
   const first = files[0].path.split('/')[0];

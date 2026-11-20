@@ -3,7 +3,7 @@ import { IngestError } from '../analyzer/engine/normalize.js';
 import { downloadGithubZip, parseGithubUrl } from './github-fetcher.js';
 import { extractZip, isZip, stripCommonRoot } from './zip-extractor.js';
 
-/** Monta um .zip mínimo em memória (sem dependências), para os testes. */
+// zip mínimo montado na mão, para não depender de lib nos testes
 function makeZip(
   entries: { name: string; data: string; symlink?: boolean }[],
 ): Buffer {

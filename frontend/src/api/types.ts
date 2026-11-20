@@ -1,4 +1,4 @@
-// Espelho dos tipos que a API devolve (backend/src/analyzer/engine/types.ts).
+// manter em sincronia com backend/src/analyzer/engine/types.ts
 
 export interface User {
   id: string

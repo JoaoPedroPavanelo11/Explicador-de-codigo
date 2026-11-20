@@ -15,7 +15,7 @@ export function Dashboard() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['analyses'],
     queryFn: () => api<Page>('/analyses?limit=50'),
-    // Enquanto houver análise em andamento, atualiza a lista sozinha.
+    // polling só enquanto tiver análise pendente
     refetchInterval: (q) => (q.state.data?.items.some((i) => isPending(i.status)) ? 2000 : false),
   })
 

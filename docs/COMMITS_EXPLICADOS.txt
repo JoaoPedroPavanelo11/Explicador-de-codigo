@@ -754,3 +754,77 @@ RELEASE  Merge da develop na main + tag v1.0.0
      tag anotada v1.0.0.
 
 ===============================================================================
+
+===============================================================================
+VERSÃO 1.0.1 — branch refactor/comentarios
+===============================================================================
+
+-------------------------------------------------------------------------------
+#48  refactor(analyzer): troca os emojis do relatório gerado por texto
+     c1282f2 · 20/11/2026 15:57 · branch refactor/comentarios
+
+     O QUE MUDOU
+     Os critérios da nota no .md passam de ícones (✅ 🟡 🔴) para texto (OK /
+     Atenção / Melhorar / n/a); saem também os ícones do caminho do
+     arquivo, dos pontos fortes e do rodapé. O exemplo em docs foi
+     regenerado.
+
+     QUAL PROBLEMA RESOLVE
+     Emojis decorativos são uma das marcas mais visíveis de conteúdo
+     gerado por IA. Em texto, o relatório fica mais sóbrio e também mais
+     fácil de ler em qualquer editor.
+
+-------------------------------------------------------------------------------
+#49  refactor: reescreve os comentários do código de forma mais direta
+     51db1e5 · 20/11/2026 15:57 · branch refactor/comentarios
+
+     O QUE MUDOU
+     Remove separadores decorativos (// ------- Backend), docblocks que só
+     repetiam o nome da função e o tom de tutorial ("Segurança:", "NUNCA",
+     "Quer ensinar o explicador...?"). Mantém comentários curtos que
+     explicam um porquê não óbvio. Aplica o Prettier nos arquivos que
+     estavam fora do padrão.
+
+     QUAL PROBLEMA RESOLVE
+     O código estava comentado como uma aula, o que deixava a cara de
+     código gerado por IA. Um dev comenta o que não é óbvio, não o que o
+     código já diz. Nenhuma lógica mudou: verificado comparando o código
+     sem comentários e espaços, e com lint, testes e builds passando.
+
+-------------------------------------------------------------------------------
+#50  chore(infra): enxuga os comentários de Docker, Nginx e .env.example
+     d9b3416 · 20/11/2026 15:57 · branch refactor/comentarios
+
+     O QUE MUDOU
+     Mesma limpeza nos Dockerfiles, nginx.conf, docker-compose e
+     .env.example.
+
+     QUAL PROBLEMA RESOLVE
+     Consistência com o resto do repositório. Validado com docker compose
+     config e nginx -t.
+
+-------------------------------------------------------------------------------
+#51  docs: remove emojis do README
+     68e0f80 · 20/11/2026 15:57 · branch refactor/comentarios
+
+     O QUE MUDOU
+     Cadeado das rotas protegidas vira (auth) e os checks da tabela de
+     variáveis viram "sim".
+
+     QUAL PROBLEMA RESOLVE
+     Mesmo motivo da troca no relatório.
+
+-------------------------------------------------------------------------------
+#52  docs: registra a versão 1.0.1 na história e nos commits
+     branch refactor/comentarios (este commit; o hash aparece no git log)
+
+     O QUE MUDOU
+     Acrescenta esta seção e a seção 10 da história do projeto.
+
+     QUAL PROBLEMA RESOLVE
+     Mantém a documentação dos commits completa.
+
+-------------------------------------------------------------------------------
+RELEASE  chore(release): v1.0.1 — merge da develop na main + tag v1.0.1
+
+===============================================================================

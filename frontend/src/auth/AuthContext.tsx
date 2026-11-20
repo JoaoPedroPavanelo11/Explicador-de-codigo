@@ -21,7 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Ao abrir o site, tenta restaurar a sessão pelo cookie de refresh.
+  // restaura a sessão pelo cookie ao abrir o site
   useEffect(() => {
     setSessionExpiredHandler(() => {
       setAccessToken(null)
@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
+// oxlint-disable-next-line react/only-export-components -- hook junto do provider
 export function useAuth(): AuthState {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth precisa estar dentro de <AuthProvider>')

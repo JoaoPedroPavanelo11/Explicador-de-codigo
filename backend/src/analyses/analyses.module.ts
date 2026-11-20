@@ -16,7 +16,6 @@ import { MetaController } from './meta.controller.js';
 @Module({
   imports: [
     BullModule.registerQueue({ name: ANALYSIS_QUEUE }),
-    // Upload em memória com limites: tamanho máximo, 1 arquivo, poucos campos.
     MulterModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => ({

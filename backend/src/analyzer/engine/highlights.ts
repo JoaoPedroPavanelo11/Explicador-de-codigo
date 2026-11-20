@@ -17,7 +17,7 @@ interface Role {
   test: (path: string, content: string) => boolean;
 }
 
-/** Papel do arquivo dentro do projeto, a partir do nome e do conteúdo. */
+// a ordem importa: o primeiro que casar vence
 const ROLES: Role[] = [
   {
     id: 'usecase',
@@ -142,8 +142,6 @@ function roleOf(path: string, content: string): Role {
   return ROLES.find((r) => r.test(path, content)) ?? OTHER;
 }
 
-// ---------------------------------------------------------------- Observações
-
 interface Trait {
   test: RegExp;
   observation: string;
@@ -151,7 +149,6 @@ interface Trait {
   weight: number;
 }
 
-/** Padrões que, quando aparecem num trecho, viram explicações didáticas. */
 const TRAITS: Trait[] = [
   {
     test: /\$transaction|\.transaction\(|@Transactional|transaction\.atomic|BEGIN TRANSACTION|db\.Begin\(|\bstartTransaction\b|withTransaction/,
@@ -182,7 +179,7 @@ const TRAITS: Trait[] = [
     weight: 2,
   },
   {
-    // um "if" seguido (na mesma linha ou na próxima) de throw/return/raise
+    // if seguido de throw/return/raise na mesma linha ou na seguinte
     test: /^\s*if\b[^\n]*(\{|:|\))?[ \t]*\n?[ \t]*(throw|return|raise)\b/m,
     observation:
       'Usa **guard clauses** (early return): trata os casos de erro logo no começo.',
@@ -308,7 +305,6 @@ function scoreUnit(u: CodeUnit): number {
   let s = 0;
   for (const t of TRAITS) if (t.test.test(u.code)) s += t.weight;
   s += Math.min(6, (u.code.match(BUSINESS_WORDS) ?? []).length);
-  // Preferimos trechos de tamanho "explicável".
   if (u.lines >= 6 && u.lines <= 45) s += 4;
   else if (u.lines > 80) s -= 3;
   else if (u.lines < 4) s -= 3;
@@ -377,7 +373,7 @@ function buildHighlight(
         : 'É um bom ponto de partida para entender como o projeto funciona por dentro.',
     );
 
-  // As observações aparecem em lista logo abaixo; aqui fica só o objetivo.
+  // as observações já aparecem em lista, não repetir aqui
   const whatItDoes = unit
     ? `A função \`${unit.name}\` (linhas ${unit.startLine}–${unit.endLine} de \`${file.path}\`) tem como objetivo ${describeName(unit.name)}.` +
       (observations.length
@@ -400,7 +396,6 @@ function buildHighlight(
   };
 }
 
-/** Escolhe os trechos mais importantes para explicar (até `max`). */
 export function selectHighlights(files: SourceFile[], max = 6): Highlight[] {
   const candidates = files
     .filter(
@@ -419,7 +414,7 @@ export function selectHighlights(files: SourceFile[], max = 6): Highlight[] {
         .map((u) => ({ u, s: scoreUnit(u) }))
         .sort((a, b) => b.s - a.s)[0];
       const lines = countLines(f.content);
-      // Arquivos sem nenhuma função reconhecida rendem explicações fracas.
+      // sem função reconhecida a explicação fica fraca
       const score =
         role.weight * 2 +
         Math.log2(lines + 1) +
@@ -429,7 +424,7 @@ export function selectHighlights(files: SourceFile[], max = 6): Highlight[] {
     .filter((c) => countLines(c.f.content) >= 5)
     .sort((a, b) => b.score - a.score);
 
-  // Diversidade: até 2 destaques de regra de negócio e 1 dos demais papéis.
+  // evita relatório com 6 controllers iguais
   const limitFor = (id: string) =>
     id === 'service' || id === 'usecase' ? 2 : 1;
   const perRole = new Map<string, number>();

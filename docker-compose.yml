@@ -1,7 +1,4 @@
-# Sobe o projeto inteiro: banco, fila, migrations, API e frontend.
-#   cp .env.example .env   (e troque os segredos)
-#   docker compose up -d --build
-# Acesse http://localhost:8080
+# cp .env.example .env && docker compose up -d --build
 
 name: explicador-de-codigo
 
@@ -21,7 +18,6 @@ services:
       timeout: 3s
       retries: 10
     networks: [backend]
-    # Sem "ports": o banco NÃO fica acessível de fora da rede do Docker.
 
   redis:
     image: redis:7-alpine
@@ -38,7 +34,6 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     networks: [backend]
 
-  # Aplica as migrations do Prisma e encerra. A API só sobe depois disso.
   migrate:
     build:
       context: ./backend
@@ -77,9 +72,9 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-    read_only: true            # sistema de arquivos somente leitura...
+    read_only: true
     tmpfs:
-      - /app/tmp:uid=1000,gid=1000,mode=0700   # ...exceto a pasta de uploads temporários
+      - /app/tmp:uid=1000,gid=1000,mode=0700 # zips temporários
       - /tmp
     security_opt:
       - no-new-privileges:true
@@ -90,7 +85,7 @@ services:
       context: ./frontend
     restart: unless-stopped
     ports:
-      - "${WEB_PORT:-8080}:8080"   # a ÚNICA porta exposta
+      - "${WEB_PORT:-8080}:8080"
     depends_on:
       api:
         condition: service_healthy

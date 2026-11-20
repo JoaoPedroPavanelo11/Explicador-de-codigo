@@ -1,7 +1,6 @@
 import { languageOf } from './languages.js';
 import type { SourceFile } from './types.js';
 
-/** Uma função/método extraído do código, com algumas métricas. */
 export interface CodeUnit {
   file: string;
   name: string;
@@ -10,9 +9,8 @@ export interface CodeUnit {
   endLine: number;
   code: string;
   lines: number;
-  /** Complexidade ciclomática aproximada (1 + pontos de decisão). */
+  // ciclomática aproximada
   complexity: number;
-  /** Maior nível de aninhamento de blocos. */
   maxNesting: number;
 }
 
@@ -54,7 +52,6 @@ const KEYWORDS = new Set([
   'constructor',
 ]);
 
-/** Tenta reconhecer a linha como início de uma função. Retorna o nome. */
 function signatureName(line: string, language: string): string | null {
   const l = line.trim();
   if (l.startsWith('//') || l.startsWith('*') || l.startsWith('#')) return null;
@@ -96,12 +93,12 @@ function signatureName(line: string, language: string): string | null {
       );
       break;
     default:
-      // JavaScript / TypeScript
+      // js/ts
       patterns.push(
         /^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s*([A-Za-z_$][\w$]*)\s*[(<]/,
         /^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*(?::\s*[^=]+)?=>/,
         /^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(?:async\s*)?\($/,
-        // Método de classe: exige "{" no fim da linha para não confundir com chamadas.
+        // método: exige "{" no fim, senão pega chamada de função
         /^(?:(?:public|private|protected|static|async|override|readonly|get|set)\s+)*([A-Za-z_$][\w$]*)\s*(?:<[^>]*>)?\s*\([^;]*\)\s*(?::\s*[^{;]+)?\{\s*$/,
       );
   }
@@ -112,7 +109,6 @@ function signatureName(line: string, language: string): string | null {
   return null;
 }
 
-/** Fim do bloco por contagem de chaves, ignorando strings e comentários. */
 function findBraceEnd(lines: string[], start: number): number | null {
   let depth = 0;
   let opened = false;
@@ -149,17 +145,16 @@ function findBraceEnd(lines: string[], start: number): number | null {
         depth--;
         if (opened && depth === 0) return i;
       } else if (ch === ';' && !opened && i === start) {
-        // Declaração sem corpo (interface/abstract)
+        // sem corpo (interface/abstract)
         return null;
       }
     }
-    // Sem "{" nas primeiras linhas: não é uma função com corpo.
     if (!opened && i > start + 4) return null;
   }
   return null;
 }
 
-/** Fim do bloco por indentação (Python). */
+// python
 function findIndentEnd(lines: string[], start: number): number {
   const indent = (s: string) => s.match(/^\s*/)?.[0].length ?? 0;
   const base = indent(lines[start]);
@@ -173,7 +168,7 @@ function findIndentEnd(lines: string[], start: number): number {
   return end;
 }
 
-/** Fim do bloco por "end" (Ruby). */
+// ruby
 function findRubyEnd(lines: string[], start: number): number {
   const indent = (s: string) => s.match(/^\s*/)?.[0].length ?? 0;
   const base = indent(lines[start]);
@@ -231,7 +226,7 @@ export function extractUnits(file: SourceFile): CodeUnit[] {
       i++;
       continue;
     }
-    // Inclui decorators/anotações e comentários logo acima da função.
+    // puxa decorators e docblock junto
     let start = i;
     while (
       start > 0 &&
@@ -251,8 +246,7 @@ export function extractUnits(file: SourceFile): CodeUnit[] {
       complexity: measureComplexity(code),
       maxNesting: measureNesting(lines.slice(i, end + 1).join('\n'), language),
     });
-    // Em classes, continuamos procurando dentro do corpo (métodos).
-    // Para funções "soltas", pulamos o corpo para não pegar funções internas.
+    // em python/ruby os métodos ficam dentro da classe, então não pula o corpo
     i = language === 'Python' || language === 'Ruby' ? i + 1 : end + 1;
   }
   return units.filter((u) => u.lines >= 2);

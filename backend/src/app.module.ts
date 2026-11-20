@@ -18,17 +18,16 @@ import { PrismaModule } from './prisma/prisma.module.js';
     }),
     PrismaModule,
     AuthModule,
-    RateLimitModule, // depois do AuthModule (ordem dos guards globais)
-    // Fila de análises (BullMQ + Redis)
+    RateLimitModule, // precisa vir depois do AuthModule
     BullModule.forRootAsync({
       inject: [ConfigService],
-      // Em ESM o BullMQ 6 pede uma instância do cliente Redis já criada.
+      // bullmq 6 em ESM só aceita instância pronta do ioredis
       useFactory: (config: ConfigService<Env, true>) => ({
         connection: new Redis({
           host: config.get('REDIS_HOST', { infer: true }),
           port: config.get('REDIS_PORT', { infer: true }),
           password: config.get('REDIS_PASSWORD', { infer: true }) || undefined,
-          maxRetriesPerRequest: null, // exigido pelos workers do BullMQ
+          maxRetriesPerRequest: null, // exigido pelo worker do bullmq
         }),
       }),
     }),

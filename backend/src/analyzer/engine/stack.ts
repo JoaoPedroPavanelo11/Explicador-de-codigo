@@ -3,7 +3,7 @@ import { languageOf, languageStats } from './languages.js';
 import type { ManifestInfo } from './manifests.js';
 import type { SourceFile, Technology } from './types.js';
 
-/** Nome do import em Python → nome do pacote no PyPI (quando diferem). */
+// import -> nome no pypi, quando são diferentes
 const PY_ALIASES: Record<string, string> = {
   sklearn: 'scikit-learn',
   jwt: 'pyjwt',
@@ -26,11 +26,7 @@ const JAVA_IMPORTS: [RegExp, string][] = [
   [/^io\.jsonwebtoken/, 'maven:jjwt-api'],
 ];
 
-/**
- * Lê os imports dos arquivos de código. Serve para quando a pessoa cola só
- * um trecho de código (sem package.json/requirements.txt): ainda assim
- * conseguimos dizer quais bibliotecas ela usa.
- */
+// para trechos colados, que não têm package.json/requirements.txt
 export function scanImports(files: SourceFile[]): Map<string, string> {
   const found = new Map<string, string>(); // chave do pacote → arquivo
   const note = (key: string, file: string) => {
@@ -99,7 +95,6 @@ export function detectTechnologies(
     techs.push(t);
   };
 
-  // 1) Linguagens principais com base nos arquivos.
   const langs = languageStats(files);
   const LANG_INFO: Record<string, { description: string; why: string }> = {
     TypeScript: {
@@ -141,10 +136,8 @@ export function detectTechnologies(
     });
   }
 
-  // 2) Runtimes e infraestrutura identificados pelos manifestos.
   for (const e of manifest.extras) push(e);
 
-  // 3) Pacotes declarados que estão no catálogo.
   for (const p of manifest.packages) {
     const entry = findInCatalog(p.key);
     if (!entry) continue;
@@ -158,7 +151,6 @@ export function detectTechnologies(
     });
   }
 
-  // 4) Imports no código (útil quando não há manifesto).
   for (const [key, file] of scanImports(files)) {
     const entry = findInCatalog(key);
     if (!entry) continue;
@@ -171,7 +163,7 @@ export function detectTechnologies(
     });
   }
 
-  // TypeScript configurado sem estar nas dependências (ex.: monorepo).
+  // monorepo costuma ter o typescript só no package.json da raiz
   if (files.some((f) => /(^|\/)tsconfig(\.\w+)?\.json$/.test(f.path)))
     push({
       name: 'TypeScript',
@@ -209,7 +201,6 @@ export function detectTechnologies(
   );
 }
 
-/** Funcionalidades sugeridas pelos pacotes (ex.: Stripe → "Pagamentos online"). */
 export function featuresFromPackages(
   manifest: ManifestInfo,
   files: SourceFile[],

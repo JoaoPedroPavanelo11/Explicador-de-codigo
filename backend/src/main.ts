@@ -10,7 +10,6 @@ import type { Env } from './config/env.js';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    // Logs em JSON (fáceis de indexar) e com dados sensíveis mascarados.
     logger: new ConsoleLogger({
       json: process.env.NODE_ENV === 'production',
       redact: ['password', 'authorization', 'cookie', 'token', 'apiKey'],
@@ -21,12 +20,11 @@ async function bootstrap() {
   const isProduction = config.get('NODE_ENV', { infer: true }) === 'production';
 
   app.setGlobalPrefix('api');
-  app.set('trust proxy', 1); // atrás do Nginx: req.ip passa a ser o IP real
-  app.disable('x-powered-by'); // não anuncia que é Express
+  app.set('trust proxy', 1); // nginx na frente
+  app.disable('x-powered-by');
   app.enableShutdownHooks();
 
-  // Headers de segurança. A API só devolve JSON/arquivos, então a CSP
-  // pode ser a mais restrita possível; o Swagger (só em dev) precisa de mais.
+  // a API só devolve json/arquivos; CSP desligada em dev por causa do swagger
   app.use(
     helmet({
       contentSecurityPolicy: isProduction
@@ -36,8 +34,6 @@ async function bootstrap() {
     }),
   );
 
-  // CORS: só o frontend configurado pode chamar a API pelo navegador,
-  // e com credenciais (o cookie do refresh token).
   app.enableCors({
     origin: config
       .get('CORS_ORIGIN', { infer: true })
@@ -50,12 +46,10 @@ async function bootstrap() {
   });
 
   app.use(cookieParser());
-  // Corpo JSON maior que o padrão (100 KB) para permitir colar código.
+  // padrão é 100kb, pouco para código colado
   app.useBodyParser('json', { limit: '3mb' });
-  // Valida body/query/params que declaram um schema Zod.
   app.useGlobalPipes(new StandardSchemaValidationPipe());
 
-  // Documentação interativa: só fora de produção, para não expor o mapa da API.
   if (!isProduction) {
     const document = SwaggerModule.createDocument(
       app,
