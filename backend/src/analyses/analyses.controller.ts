@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { CurrentUser } from '@nestjs/authentication';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import type { PublicUser } from '../users/users.repository.js';
 import { AnalysesService } from './analyses.service.js';
@@ -37,6 +38,7 @@ export class AnalysesController {
   /** Analisa código colado no editor (um ou vários arquivos). */
   @Post('paste')
   @HttpCode(202)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   paste(
     @CurrentUser() user: PublicUser,
     @Body({ schema: pasteSchema }) body: PasteInput,
@@ -47,6 +49,7 @@ export class AnalysesController {
   /** Analisa um projeto enviado como .zip (multipart/form-data, campo "file"). */
   @Post('upload')
   @HttpCode(202)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @UseInterceptors(FileInterceptor('file'))
   upload(
     @CurrentUser() user: PublicUser,
@@ -59,6 +62,7 @@ export class AnalysesController {
   /** Analisa um repositório público do GitHub. */
   @Post('github')
   @HttpCode(202)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   github(
     @CurrentUser() user: PublicUser,
     @Body({ schema: githubSchema }) body: GithubInput,

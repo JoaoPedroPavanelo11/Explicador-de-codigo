@@ -15,6 +15,7 @@ import {
   RefreshTokenError,
   TokenService,
 } from '@nestjs/authentication';
+import { Throttle } from '@nestjs/throttler';
 import type { CookieOptions, Request, Response } from 'express';
 import type { Env } from '../config/env.js';
 import type { PublicUser } from '../users/users.repository.js';
@@ -41,7 +42,9 @@ export class AuthController {
     private readonly config: ConfigService<Env, true>,
   ) {}
 
+  // Limites bem menores nas rotas de credenciais: dificulta força bruta.
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('register')
   async register(
     @Body({ schema: registerSchema }) body: RegisterInput,
@@ -52,6 +55,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('login')
   @HttpCode(200)
   async login(
@@ -65,6 +69,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post('refresh')
   @HttpCode(200)
   async refresh(

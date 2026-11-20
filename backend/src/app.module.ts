@@ -6,6 +6,7 @@ import { AnalysesModule } from './analyses/analyses.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { validateEnv, type Env } from './config/env.js';
 import { HealthModule } from './health/health.module.js';
+import { RateLimitModule } from './security/rate-limit.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 
 @Module({
@@ -17,6 +18,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
     }),
     PrismaModule,
     AuthModule,
+    RateLimitModule, // depois do AuthModule (ordem dos guards globais)
     // Fila de análises (BullMQ + Redis)
     BullModule.forRootAsync({
       inject: [ConfigService],
