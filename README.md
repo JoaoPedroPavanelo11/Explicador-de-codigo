@@ -248,7 +248,7 @@ TypeScript puro, sem dependência de framework e **determinístico** (a mesma en
 | Nota | `quality.ts` | 15 critérios ponderados (ver abaixo). |
 | Relatório | `report.ts` | Gera o Markdown final com as 4 seções. |
 
-> Quer ensinar o explicador a reconhecer uma tecnologia nova? Adicione uma entrada em `catalog.ts`. 🙂
+> Quer ensinar o explicador a reconhecer uma tecnologia nova? Adicione uma entrada em `catalog.ts`.
 
 ## Como a nota é calculada
 
@@ -277,7 +277,7 @@ Faixas: **9+** Excelente · **7,5+** Muito bom · **6+** Bom caminho · **4+** E
 
 ## API (endpoints)
 
-Todas as rotas ficam sob `/api`. Rotas marcadas com 🔒 exigem `Authorization: Bearer <accessToken>`.
+Todas as rotas ficam sob `/api`. Rotas marcadas com **(auth)** exigem `Authorization: Bearer <accessToken>`.
 A documentação interativa completa está em `/api/docs` (modo desenvolvimento).
 
 | Método | Rota | Descrição |
@@ -286,14 +286,14 @@ A documentação interativa completa está em `/api/docs` (modo desenvolvimento)
 | `POST` | `/auth/login` | Entra (devolve o access token; o refresh token vai num cookie httpOnly) |
 | `POST` | `/auth/refresh` | Troca o refresh token por um novo par (rotação) |
 | `POST` | `/auth/logout` | Encerra a sessão |
-| `GET` | `/auth/me` 🔒 | Dados da pessoa logada |
-| `POST` | `/analyses/paste` 🔒 | Analisa código colado (`{ files: [{ path, content }], title?, useAi? }`) |
-| `POST` | `/analyses/upload` 🔒 | Analisa um `.zip` (multipart, campo `file`) |
-| `POST` | `/analyses/github` 🔒 | Analisa um repositório público (`{ url }`) |
-| `GET` | `/analyses` 🔒 | Lista as suas análises (paginação por cursor) |
-| `GET` | `/analyses/:id` 🔒 | Status e resultado completo |
-| `GET` | `/analyses/:id/report` 🔒 | Download do relatório `.md` |
-| `DELETE` | `/analyses/:id` 🔒 | Exclui a análise |
+| `GET` | `/auth/me` (auth) | Dados da pessoa logada |
+| `POST` | `/analyses/paste` (auth) | Analisa código colado (`{ files: [{ path, content }], title?, useAi? }`) |
+| `POST` | `/analyses/upload` (auth) | Analisa um `.zip` (multipart, campo `file`) |
+| `POST` | `/analyses/github` (auth) | Analisa um repositório público (`{ url }`) |
+| `GET` | `/analyses` (auth) | Lista as suas análises (paginação por cursor) |
+| `GET` | `/analyses/:id` (auth) | Status e resultado completo |
+| `GET` | `/analyses/:id/report` (auth) | Download do relatório `.md` |
+| `DELETE` | `/analyses/:id` (auth) | Exclui a análise |
 | `GET` | `/meta` | Se a IA está disponível e os limites |
 | `GET` | `/health` · `/ready` | Liveness e readiness (banco) |
 
@@ -312,9 +312,9 @@ curl -X POST http://localhost:3000/api/analyses/paste \
 
 | Variável | Obrigatória | Descrição |
 |---|:-:|---|
-| `POSTGRES_PASSWORD` | ✅ | Senha do PostgreSQL |
-| `REDIS_PASSWORD` | ✅ | Senha do Redis |
-| `JWT_SECRET` | ✅ | Segredo dos tokens (mínimo 32 caracteres — a API não sobe sem isso) |
+| `POSTGRES_PASSWORD` | sim | Senha do PostgreSQL |
+| `REDIS_PASSWORD` | sim | Senha do Redis |
+| `JWT_SECRET` | sim | Segredo dos tokens (mínimo 32 caracteres — a API não sobe sem isso) |
 | `PUBLIC_URL` | | Endereço do frontend, usado no CORS (padrão `http://localhost:8080`) |
 | `WEB_PORT` | | Porta exposta (padrão `8080`) |
 | `UPLOAD_MAX_MB` | | Tamanho máximo do `.zip` (padrão `10`) |
@@ -399,7 +399,7 @@ A explicação de **cada commit** está em [`docs/COMMITS_EXPLICADOS.txt`](docs/
 ├── backend/                     API NestJS
 │   ├── prisma/                  schema e migrations do banco
 │   ├── src/
-│   │   ├── analyzer/engine/     ⭐ motor de análise (TypeScript puro)
+│   │   ├── analyzer/engine/     motor de análise (TypeScript puro)
 │   │   ├── analyses/            endpoints, fila (worker) e repositório das análises
 │   │   ├── ingestion/           leitura segura de .zip e download do GitHub
 │   │   ├── ai/                  enriquecimento opcional com Claude
