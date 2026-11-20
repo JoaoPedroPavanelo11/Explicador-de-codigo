@@ -3,7 +3,7 @@ import type { ArchitecturePattern, SourceFile } from './types.js';
 
 interface Rule {
   name: string;
-  /** Retorna evidências (vazio = padrão não encontrado). */
+  // lista vazia = não encontrado
   detect: (ctx: Ctx) => string[];
   explanation: string;
   why: string;
@@ -260,12 +260,10 @@ export function detectArchitecture(files: SourceFile[]): ArchitecturePattern[] {
         why: rule.why,
       });
   }
-  // "Camadas" é implícito quando já detectamos módulos do Nest/Clean Architecture
-  // — mantemos ambos, pois um não exclui o outro.
   return found;
 }
 
-/** Árvore de pastas resumida (até 3 níveis), no estilo do comando `tree`. */
+// até 3 níveis, estilo `tree`
 export function buildTree(files: SourceFile[], maxLines = 45): string {
   interface Node {
     children: Map<string, Node>;

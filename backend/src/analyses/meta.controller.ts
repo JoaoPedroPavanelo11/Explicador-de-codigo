@@ -6,7 +6,6 @@ import { ENGINE_VERSION } from '../analyzer/engine/analyzer.js';
 import type { Env } from '../config/env.js';
 import { MAX_PENDING_PER_USER } from './analyses.constants.js';
 
-/** Informações públicas que o frontend usa para montar a tela. */
 @Public()
 @Controller('meta')
 export class MetaController {

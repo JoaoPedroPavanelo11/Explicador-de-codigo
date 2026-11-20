@@ -8,7 +8,7 @@ import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
 
-/** Precisa de PostgreSQL e Redis rodando (docker-compose.dev.yml). */
+// precisa do docker-compose.dev.yml rodando
 describe('Análises (e2e)', () => {
   let app: INestApplication<App>;
   let tokenA: string;
@@ -61,7 +61,6 @@ describe('Análises (e2e)', () => {
       .expect(202);
     expect(created.body.status).toBe('QUEUED');
 
-    // Aguarda o worker da fila terminar.
     let analysis: { status: string; score: number | null } = {
       status: 'QUEUED',
       score: null,
@@ -89,7 +88,6 @@ describe('Análises (e2e)', () => {
     expect(report.headers['content-disposition']).toContain('attachment');
     expect(report.text).toContain('## 4. Nota e como melhorar');
 
-    // Outra pessoa não enxerga a análise (nem sabe que ela existe).
     await request(server)
       .get(`/api/analyses/${created.body.id}`)
       .set('Authorization', `Bearer ${tokenB}`)

@@ -1,6 +1,6 @@
 # Explicação do código — Banco Digital API (exemplo)
 
-> Gerado pelo **Explicador de Código** em 20/11/2026, 11:51:24 · 11 arquivos · 116 linhas
+> Gerado pelo **Explicador de Código** em 20/11/2026, 12:57:34 · 11 arquivos · 116 linhas
 
 **Nota geral: 6.0/10 — Bom caminho**
 
@@ -78,7 +78,7 @@ A linguagem principal é **TypeScript** (100% das linhas). Identifiquei **9 tecn
 
 ### 3.1 `transfer()` — Service (regra de negócio)
 
-📄 `src/transfers/transfers.service.ts` (linhas 9–23)
+`src/transfers/transfers.service.ts` (linhas 9–23)
 
 > A camada de serviço concentra as regras de negócio. Fica entre o controller (que recebe a requisição) e o acesso a dados — é aqui que mora a "inteligência" do sistema.
 
@@ -118,7 +118,7 @@ A linguagem principal é **TypeScript** (100% das linhas). Identifiquei **9 tecn
 
 ### 3.2 `getBalance()` — Service (regra de negócio)
 
-📄 `src/accounts/accounts.service.ts` (linhas 12–16)
+`src/accounts/accounts.service.ts` (linhas 12–16)
 
 > A camada de serviço concentra as regras de negócio. Fica entre o controller (que recebe a requisição) e o acesso a dados — é aqui que mora a "inteligência" do sistema.
 
@@ -143,7 +143,7 @@ A linguagem principal é **TypeScript** (100% das linhas). Identifiquei **9 tecn
 
 ### 3.3 `transfer()` — Controller (entrada HTTP)
 
-📄 `src/transfers/transfers.controller.ts` (linhas 5–8)
+`src/transfers/transfers.controller.ts` (linhas 5–8)
 
 > O controller é a porta de entrada: recebe a requisição HTTP, valida/extrai os dados e delega o trabalho para a camada de negócio.
 
@@ -168,9 +168,9 @@ Uma base boa, que já funciona. Com as melhorias abaixo, o código fica mais seg
 
 **Pontos fortes:**
 
-- ✅ As funções são curtas e focadas — fáceis de ler e de testar.
-- ✅ Usa tipagem estática, o que pega muitos erros antes mesmo de rodar.
-- ✅ Valida os dados que chegam na API — uma das defesas mais importantes.
+- As funções são curtas e focadas — fáceis de ler e de testar.
+- Usa tipagem estática, o que pega muitos erros antes mesmo de rodar.
+- Valida os dados que chegam na API — uma das defesas mais importantes.
 
 **O que pode melhorar (em ordem de prioridade):**
 
@@ -200,24 +200,24 @@ Uma base boa, que já funciona. Com as melhorias abaixo, o código fica mais seg
 
 | | Critério | Pontos | Detalhe |
 |---|---|---:|---|
-| 🔴 | Sem segredos expostos no código | 0/15 | 1 possível(is) segredo(s): src/config.ts:2 (Senha/segredo atribuído no código: meuS************) |
-| 🟡 | Testes automatizados | 11.3/15 | 1 arquivo(s) de teste para 7 arquivo(s) de código. |
-| ✅ | Funções pequenas e focadas | 10/10 | 0 de 7 funções têm mais de 50 linhas. |
-| ✅ | Complexidade sob controle | 8/8 | 0 função(ões) com muitos caminhos de decisão ou aninhamento profundo. |
-| 🔴 | README que explica o projeto | 2.1/7 | README com 196 caracteres e instruções de uso. |
-| ✅ | Tipagem | 7/7 | Linguagem com tipagem estática (TypeScript). |
-| 🔴 | Linter e formatador configurados | 0/6 | Nenhuma configuração de linter/formatador encontrada. |
-| ✅ | Arquivos com tamanho razoável | 5/5 | 0 arquivo(s) com mais de 400 linhas. |
-| ✅ | Tratamento de erros | 5/5 | O código trata e sinaliza erros explicitamente. |
-| ✅ | Validação de dados de entrada | 5/5 | Usa biblioteca/mecanismo de validação. |
-| ✅ | Sem restos de depuração | 4/4 | 0 ocorrência(s) de console.log/print de depuração. |
-| ✅ | Pendências (TODO/FIXME) sob controle | 3/3 | 0 TODO/FIXME no código. |
-| 🔴 | .gitignore e configuração por ambiente | 0/4 | Sem .gitignore; usa variáveis de ambiente sem .env.example. |
-| 🔴 | Integração contínua (CI) | 0/3 | Sem pipeline de CI. |
-| 🔴 | Ambiente reproduzível (Docker) | 0/3 | Sem Docker. |
+| Melhorar | Sem segredos expostos no código | 0/15 | 1 possível(is) segredo(s): src/config.ts:2 (Senha/segredo atribuído no código: meuS************) |
+| Atenção | Testes automatizados | 11.3/15 | 1 arquivo(s) de teste para 7 arquivo(s) de código. |
+| OK | Funções pequenas e focadas | 10/10 | 0 de 7 funções têm mais de 50 linhas. |
+| OK | Complexidade sob controle | 8/8 | 0 função(ões) com muitos caminhos de decisão ou aninhamento profundo. |
+| Melhorar | README que explica o projeto | 2.1/7 | README com 196 caracteres e instruções de uso. |
+| OK | Tipagem | 7/7 | Linguagem com tipagem estática (TypeScript). |
+| Melhorar | Linter e formatador configurados | 0/6 | Nenhuma configuração de linter/formatador encontrada. |
+| OK | Arquivos com tamanho razoável | 5/5 | 0 arquivo(s) com mais de 400 linhas. |
+| OK | Tratamento de erros | 5/5 | O código trata e sinaliza erros explicitamente. |
+| OK | Validação de dados de entrada | 5/5 | Usa biblioteca/mecanismo de validação. |
+| OK | Sem restos de depuração | 4/4 | 0 ocorrência(s) de console.log/print de depuração. |
+| OK | Pendências (TODO/FIXME) sob controle | 3/3 | 0 TODO/FIXME no código. |
+| Melhorar | .gitignore e configuração por ambiente | 0/4 | Sem .gitignore; usa variáveis de ambiente sem .env.example. |
+| Melhorar | Integração contínua (CI) | 0/3 | Sem pipeline de CI. |
+| Melhorar | Ambiente reproduzível (Docker) | 0/3 | Sem Docker. |
 
 </details>
 
 ---
 
-_Este relatório foi gerado automaticamente a partir de análise estática. Ele é um ponto de partida para conversas e melhorias — não um julgamento. Todo código pode evoluir. 🚀_
+_Este relatório foi gerado automaticamente a partir de análise estática. Ele é um ponto de partida para conversas e melhorias — não um julgamento. Todo código pode evoluir._

@@ -11,8 +11,7 @@ import './auth.types.js';
 
 @Module({
   imports: [
-    // Registra um guard GLOBAL: toda rota exige login, exceto as marcadas
-    // com @Public(). "Fechado por padrão" é mais seguro que "aberto por padrão".
+    // guard global: tudo exige login, exceto rotas com @Public()
     AuthenticationModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => ({

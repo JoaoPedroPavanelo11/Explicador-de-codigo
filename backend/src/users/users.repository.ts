@@ -2,7 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
-/** O usuário como o resto da aplicação o enxerga: SEM o hash da senha. */
+// sem passwordHash
 export interface PublicUser {
   id: string;
   email: string;
@@ -17,10 +17,7 @@ const publicFields = {
   createdAt: true,
 } satisfies Prisma.UserSelect;
 
-/**
- * Único lugar que toca na tabela users. O hash da senha nunca sai daqui,
- * exceto em findCredentials(), usado apenas na verificação do login.
- */
+// o hash só sai daqui via findCredentials(), usado no login
 @Injectable()
 export class UsersRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -33,8 +30,7 @@ export class UsersRepository {
     try {
       return await this.prisma.user.create({ data, select: publicFields });
     } catch (error) {
-      // Insere direto e trata a violação de unicidade (P2002).
-      // Consultar antes e depois inserir abre espaço para condição de corrida.
+      // insert direto + P2002 em vez de checar antes (evita corrida)
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'

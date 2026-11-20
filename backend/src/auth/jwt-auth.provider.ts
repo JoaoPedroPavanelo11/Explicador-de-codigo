@@ -4,16 +4,9 @@ import {
   JwtBearerProvider,
   type JwtClaims,
 } from '@nestjs/authentication';
-import {
-  UsersRepository,
-  type PublicUser,
-} from '../users/users.repository.js';
+import { UsersRepository, type PublicUser } from '../users/users.repository.js';
 
-/**
- * Lê o header "Authorization: Bearer <token>", valida assinatura e expiração
- * do JWT e carrega o usuário do banco a cada requisição — assim um usuário
- * excluído perde o acesso na hora, sem esperar o token expirar.
- */
+// busca o usuário a cada request para que um usuário excluído perca o acesso na hora
 @Injectable()
 export class JwtAuthProvider extends JwtBearerProvider<PublicUser> {
   constructor(

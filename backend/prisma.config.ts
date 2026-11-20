@@ -1,5 +1,4 @@
-// Configuração da CLI do Prisma (v7): onde está o schema, as migrations
-// e qual banco usar. O .env é carregado aqui porque o Prisma 7 não o lê sozinho.
+// o prisma 7 não carrega o .env sozinho
 import 'dotenv/config';
 import { defineConfig } from 'prisma/config';
 

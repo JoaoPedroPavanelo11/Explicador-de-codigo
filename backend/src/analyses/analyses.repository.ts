@@ -20,11 +20,7 @@ const summaryFields = {
   finishedAt: true,
 } satisfies Prisma.AnalysisSelect;
 
-/**
- * Toda consulta filtra pelo dono (userId) NA PRÓPRIA QUERY. Assim, uma
- * análise de outra pessoa simplesmente "não existe" (404) — não há como
- * esquecer uma checagem de permissão depois de carregar o registro.
- */
+// toda query filtra por userId: análise de outra pessoa vira 404, sem checagem extra
 @Injectable()
 export class AnalysesRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -51,7 +47,6 @@ export class AnalysesRepository {
     });
   }
 
-  /** Paginação por cursor (estável mesmo com novas análises chegando). */
   async list(userId: string, limit: number, cursor?: string) {
     const rows = await this.prisma.analysis.findMany({
       where: { userId },
@@ -90,8 +85,6 @@ export class AnalysesRepository {
     });
     return count === 1;
   }
-
-  // ---- usados pelo worker da fila (sem usuário: o job já foi autorizado) ----
 
   findForProcessing(id: string) {
     return this.prisma.analysis.findUnique({

@@ -13,7 +13,6 @@ export const DEFAULT_LIMITS: IngestLimits = {
   maxTotalBytes: 25 * 1024 * 1024,
 };
 
-/** Pastas que nunca analisamos: dependências, builds, caches. */
 const IGNORED_DIRS = new Set([
   'node_modules',
   '.git',
@@ -52,11 +51,7 @@ const IGNORED_FILES =
 
 export class IngestError extends Error {}
 
-/**
- * Normaliza e valida um caminho vindo de fora (upload, zip, JSON).
- * Bloqueia path traversal ("../"), caminhos absolutos e caracteres estranhos.
- * Retorna null para caminhos que devem ser ignorados.
- */
+// null = ignorar. Bloqueia "../", caminho absoluto e byte nulo.
 export function normalizePath(raw: string): string | null {
   if (raw.includes('\0')) return null;
   const unified = raw.replace(/\\/g, '/').replace(/^\.\/+/, '');
@@ -64,14 +59,13 @@ export function normalizePath(raw: string): string | null {
   const parts = unified.split('/').filter((p) => p !== '' && p !== '.');
   if (parts.length === 0 || parts.some((p) => p === '..')) return null;
   if (parts.some((p) => IGNORED_DIRS.has(p))) return null;
-  // Ignora metadados do macOS dentro de zips.
+  // lixo do macOS em zips
   if (parts[0] === '__MACOSX' || parts[parts.length - 1].startsWith('._'))
     return null;
   const path = parts.join('/');
   return path.length <= 300 ? path : null;
 }
 
-/** Heurística simples: arquivos com byte nulo são binários. */
 export function looksBinary(buf: Buffer): boolean {
   const sample = buf.subarray(0, Math.min(buf.length, 8000));
   return sample.includes(0);
@@ -82,10 +76,6 @@ export interface NormalizeResult {
   skipped: number;
 }
 
-/**
- * Recebe arquivos crus (de qualquer origem) e devolve só o que vale analisar,
- * respeitando os limites — a proteção contra entradas gigantes acontece aqui.
- */
 export function normalizeFiles(
   raw: { path: string; content: string | Buffer }[],
   limits: IngestLimits = DEFAULT_LIMITS,

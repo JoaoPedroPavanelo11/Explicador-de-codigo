@@ -7,15 +7,8 @@ import {
 import type { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 
-/**
- * Guarda os refresh tokens no PostgreSQL.
- *
- * Como funciona a rotação:
- *  1. No login o usuário recebe um refresh token (família nova).
- *  2. Cada uso troca o token por um novo (mesma família) e marca o antigo como usado.
- *  3. Se um token JÁ USADO aparecer de novo, alguém o copiou: a família inteira
- *     é revogada e o usuário precisa entrar de novo.
- */
+// store de refresh tokens no postgres. Token já usado que aparece de novo
+// revoga a família toda (o TokenService cuida disso, aqui só persistimos).
 @Injectable()
 export class PrismaRefreshTokenStore implements RefreshTokenStore {
   constructor(
@@ -35,17 +28,15 @@ export class PrismaRefreshTokenStore implements RefreshTokenStore {
       createdAt: row.createdAt,
       expiresAt: row.expiresAt,
       familyExpiresAt: row.familyExpiresAt,
-      // O contrato pede "undefined" para campos ausentes, nunca null.
+      // o contrato quer undefined, não null
       ...(row.usedAt ? { usedAt: row.usedAt } : {}),
-      ...(row.claims
-        ? { claims: row.claims as Record<string, unknown> }
-        : {}),
+      ...(row.claims ? { claims: row.claims as Record<string, unknown> } : {}),
     };
   }
 
   async saveRefreshToken(record: RefreshTokenRecord): Promise<void> {
     await this.prisma.$transaction([
-      // Limpeza: famílias que já passaram do prazo máximo não servem mais.
+      // aproveita para limpar famílias vencidas
       this.prisma.refreshToken.deleteMany({
         where: { familyExpiresAt: { lt: record.createdAt } },
       }),
@@ -59,17 +50,15 @@ export class PrismaRefreshTokenStore implements RefreshTokenStore {
           familyExpiresAt: record.familyExpiresAt,
           usedAt: record.usedAt ?? null,
           claims: (record.claims ?? undefined) as
-            | Prisma.InputJsonValue
-            | undefined,
+            Prisma.InputJsonValue | undefined,
         },
       }),
     ]);
   }
 
   async markRefreshTokenUsed(id: string, at: Date): Promise<boolean> {
-    // UMA escrita condicional (UPDATE ... WHERE used_at IS NULL).
-    // Ler e depois escrever permitiria que duas requisições simultâneas
-    // usassem o mesmo token.
+    // precisa ser um único UPDATE condicional; ler e depois escrever deixa
+    // duas requisições simultâneas usarem o mesmo token
     const { count } = await this.prisma.refreshToken.updateMany({
       where: { id, usedAt: null },
       data: { usedAt: at },

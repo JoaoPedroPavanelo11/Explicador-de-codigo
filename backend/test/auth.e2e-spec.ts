@@ -57,12 +57,12 @@ describe('Autenticação (e2e)', () => {
       .expect(200);
     const secondCookie = refreshCookie(refreshed);
 
-    // Reutilizar o primeiro token (já trocado) = possível roubo.
+    // reuso do token antigo
     await request(server)
       .post('/api/auth/refresh')
       .set('Cookie', firstCookie)
       .expect(401);
-    // ...e por segurança a família inteira foi revogada.
+    // e a família inteira caiu junto
     await request(server)
       .post('/api/auth/refresh')
       .set('Cookie', secondCookie)

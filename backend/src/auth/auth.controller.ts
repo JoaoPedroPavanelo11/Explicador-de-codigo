@@ -29,11 +29,7 @@ import { CredentialsService } from './credentials.service.js';
 
 export const REFRESH_COOKIE = 'explicador_rt';
 
-/**
- * O access token (curto, 15 min) vai no corpo da resposta e o frontend o
- * guarda só em memória. O refresh token vai num cookie httpOnly: JavaScript
- * nenhum consegue lê-lo, o que protege contra roubo via XSS.
- */
+// access token no corpo (front guarda em memória), refresh token em cookie httpOnly
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -42,7 +38,6 @@ export class AuthController {
     private readonly config: ConfigService<Env, true>,
   ) {}
 
-  // Limites bem menores nas rotas de credenciais: dificulta força bruta.
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('register')
@@ -63,7 +58,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const user = await this.credentials.verify(body.email, body.password);
-    // Mesma mensagem para e-mail inexistente e senha errada.
+    // mesma resposta para e-mail inexistente e senha errada
     if (!user) throw new UnauthorizedException('E-mail ou senha inválidos');
     return this.startSession(user, res);
   }

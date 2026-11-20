@@ -416,4 +416,28 @@ Cada etapa foi feita numa branch própria e integrada na develop com merge
   release (develop → main)
     Merge com a tag v1.0.0
 
+-------------------------------------------------------------------------------
+10. VERSÃO 1.0.1 — TIRANDO A "CARA DE IA" DO CÓDIGO
+-------------------------------------------------------------------------------
+
+  Depois da v1.0.0, a revisão foi sobre a aparência do código. Ele estava
+  comentado como um tutorial: separadores decorativos, docblocks repetindo
+  o nome da função, palavras em caixa alta ("NUNCA", "SEGURANÇA") e emojis
+  no relatório e no README. Isso funciona, mas tem cara de código gerado.
+
+  O que foi feito (branch refactor/comentarios):
+    - Comentários reescritos no estilo de quem programa no dia a dia: só o
+      que não é óbvio (por que o UPDATE do refresh token precisa ser
+      condicional, por que a URL do GitHub nunca é requisitada, por que o
+      RateLimitModule vem depois do AuthModule...).
+    - Emojis do relatório trocados por texto (OK / Atenção / Melhorar).
+    - Mesma limpeza em Docker, Nginx, compose e .env.example.
+
+  Como garantimos que nada quebrou:
+    - Script comparando cada arquivo antes e depois, ignorando comentários
+      e espaços: as únicas diferenças de código foram os textos do
+      relatório e a formatação do Prettier.
+    - Lint, 56 testes unitários, 6 e2e, 6 do frontend e os builds passando.
+    - docker compose config e nginx -t validando a infraestrutura.
+
 ===============================================================================

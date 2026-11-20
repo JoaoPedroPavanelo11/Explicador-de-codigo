@@ -5,19 +5,12 @@ export interface GithubRepoRef {
   repo: string;
 }
 
-// Regras de nomes do GitHub: usuário/organização até 39 caracteres
-// (letras, números e hífen); repositório com letras, números, ".", "-" e "_".
+// regras de nome do github
 const OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 const REPO = /^[A-Za-z0-9._-]{1,100}$/;
 
-/**
- * Valida e interpreta uma URL de repositório PÚBLICO do GitHub.
- *
- * Segurança (SSRF): nunca fazemos requisição para uma URL enviada pelo
- * usuário. Extraímos apenas "dono" e "repositório", validamos com regex
- * estritas e montamos nós mesmos a URL do download, sempre no mesmo host.
- * Assim ninguém consegue usar o servidor para acessar a rede interna.
- */
+// a URL do usuário nunca é requisitada: só tiramos dono/repo dela e o download
+// é montado sempre em codeload.github.com (evita SSRF)
 export function parseGithubUrl(input: string): GithubRepoRef {
   let url: URL;
   try {
@@ -61,7 +54,6 @@ export interface FetchOptions {
   fetchImpl?: typeof fetch;
 }
 
-/** Baixa o .zip do branch padrão de um repositório público, com limite de tamanho e tempo. */
 export async function downloadGithubZip(
   ref: GithubRepoRef,
   opts: FetchOptions,
@@ -91,7 +83,7 @@ export async function downloadGithubZip(
         `O repositório é grande demais (limite de ${Math.round(opts.maxBytes / 1024 / 1024)} MB compactado).`,
       );
 
-    // Lê em streaming e corta no limite: o content-length pode não existir ou mentir.
+    // content-length pode faltar ou mentir, então conta durante a leitura
     const chunks: Uint8Array[] = [];
     let size = 0;
     const reader = res.body.getReader();

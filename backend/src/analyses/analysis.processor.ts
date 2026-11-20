@@ -14,10 +14,6 @@ import { AiExplainerService } from '../ai/ai-explainer.service.js';
 import { AnalysesRepository } from './analyses.repository.js';
 import { ANALYSIS_QUEUE, type AnalysisJobData } from './analyses.constants.js';
 
-/**
- * Worker da fila: roda fora da requisição HTTP. O usuário recebe "202
- * Accepted" na hora e o frontend acompanha o status até ficar pronto.
- */
 @Processor(ANALYSIS_QUEUE, { concurrency: 2 })
 export class AnalysisProcessor extends WorkerHost {
   private readonly logger = new Logger(AnalysisProcessor.name);
@@ -47,7 +43,7 @@ export class AnalysisProcessor extends WorkerHost {
         try {
           result = await this.ai.enhance(result);
         } catch (error) {
-          // A IA é um bônus: se falhar, entregamos a análise estática normalmente.
+          // sem IA a análise continua válida
           this.logger.warn(
             `IA indisponível para ${analysisId}: ${error instanceof Error ? error.message : String(error)}`,
           );
@@ -70,7 +66,7 @@ export class AnalysisProcessor extends WorkerHost {
     } catch (error) {
       const isLastAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
       if (error instanceof IngestError) {
-        // Erro do usuário (zip inválido, repo privado...): não adianta tentar de novo.
+        // erro de entrada (zip inválido, repo privado): retry não resolve
         await this.analyses.markFailed(analysisId, error.message);
         await this.cleanup(job.data);
         throw new UnrecoverableError(error.message);
@@ -80,7 +76,6 @@ export class AnalysisProcessor extends WorkerHost {
         error instanceof Error ? error.stack : String(error),
       );
       if (isLastAttempt) {
-        // Mensagem genérica: detalhes internos ficam só no log do servidor.
         await this.analyses.markFailed(
           analysisId,
           'Ocorreu um erro interno ao analisar o código. Tente novamente.',
@@ -105,7 +100,6 @@ export class AnalysisProcessor extends WorkerHost {
     }
   }
 
-  /** O código enviado nunca fica guardado: o .zip temporário é apagado ao final. */
   private async cleanup({ source }: AnalysisJobData) {
     if (source.kind === 'zip')
       await unlink(source.tmpPath).catch(() => undefined);

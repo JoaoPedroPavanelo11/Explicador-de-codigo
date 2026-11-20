@@ -1,10 +1,10 @@
 import type { AnalysisResult, CheckStatus } from './types.js';
 
 const STATUS_ICON: Record<CheckStatus, string> = {
-  ok: '✅',
-  atencao: '🟡',
-  melhorar: '🔴',
-  na: '➖',
+  ok: 'OK',
+  atencao: 'Atenção',
+  melhorar: 'Melhorar',
+  na: 'n/a',
 };
 
 const LANG_FENCE: Record<string, string> = {
@@ -27,10 +27,9 @@ const LANG_FENCE: Record<string, string> = {
   Scala: 'scala',
 };
 
-/** Evita que um texto quebre a formatação de uma tabela Markdown. */
 const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
-/** Escolhe uma cerca de código que não apareça dentro do trecho. */
+// se o trecho tiver ``` dentro, usa mais crases na cerca
 function fence(code: string): string {
   let f = '```';
   while (code.includes(f)) f += '`';
@@ -55,7 +54,6 @@ export function renderMarkdown(r: AnalysisResult, title: string): string {
   out.push(`**Nota geral: ${quality.score.toFixed(1)}/10 — ${quality.level}**`);
   out.push('');
 
-  // ------------------------------------------------------------------ 1
   out.push('## 1. A ideia do código');
   out.push('');
   out.push(idea.summary);
@@ -80,7 +78,6 @@ export function renderMarkdown(r: AnalysisResult, title: string): string {
     out.push('');
   }
 
-  // ------------------------------------------------------------------ 2
   out.push('## 2. Stack e estrutura');
   out.push('');
   out.push(stack.summary);
@@ -131,7 +128,6 @@ export function renderMarkdown(r: AnalysisResult, title: string): string {
     out.push('');
   }
 
-  // ------------------------------------------------------------------ 3
   out.push('## 3. Pontos importantes do código');
   out.push('');
   if (highlights.length === 0)
@@ -139,7 +135,7 @@ export function renderMarkdown(r: AnalysisResult, title: string): string {
   highlights.forEach((h, i) => {
     out.push(`### 3.${i + 1} \`${h.title}\` — ${h.role}`);
     out.push('');
-    out.push(`📄 \`${h.file}\` (linhas ${h.startLine}–${h.endLine})`);
+    out.push(`\`${h.file}\` (linhas ${h.startLine}–${h.endLine})`);
     out.push('');
     out.push(`> ${h.roleExplanation}`);
     out.push('');
@@ -160,7 +156,6 @@ export function renderMarkdown(r: AnalysisResult, title: string): string {
     out.push('');
   });
 
-  // ------------------------------------------------------------------ 4
   out.push('## 4. Nota e como melhorar');
   out.push('');
   out.push(`### ${quality.score.toFixed(1)} / 10 — ${quality.level}`);
@@ -170,7 +165,7 @@ export function renderMarkdown(r: AnalysisResult, title: string): string {
   if (quality.strengths.length) {
     out.push('**Pontos fortes:**');
     out.push('');
-    for (const s of quality.strengths) out.push(`- ✅ ${s}`);
+    for (const s of quality.strengths) out.push(`- ${s}`);
     out.push('');
   }
   if (quality.improvements.length) {
@@ -211,7 +206,7 @@ export function renderMarkdown(r: AnalysisResult, title: string): string {
   out.push(
     '_Este relatório foi gerado automaticamente a partir de análise estática' +
       (meta.aiEnhanced ? ' e IA' : '') +
-      '. Ele é um ponto de partida para conversas e melhorias — não um julgamento. Todo código pode evoluir. 🚀_',
+      '. Ele é um ponto de partida para conversas e melhorias — não um julgamento. Todo código pode evoluir._',
   );
   out.push('');
   return out.join('\n');

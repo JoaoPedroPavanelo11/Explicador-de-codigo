@@ -21,7 +21,7 @@ export interface QualityInput {
   techs: Technology[];
   secrets: SecretFinding[];
   isApi: boolean;
-  /** Trecho colado (sem estrutura de projeto): checks de projeto viram "n/a". */
+  // trecho solto: testes, readme, ci etc. não entram na conta
   isSnippet: boolean;
 }
 
@@ -38,11 +38,7 @@ const isCodeFile = (p: string) => {
   );
 };
 
-/**
- * Calcula a nota (0 a 10) a partir de critérios objetivos, cada um com um
- * peso. Critérios que não se aplicam (ex.: validação de entrada num projeto
- * que não é API) saem da conta, para a nota ser justa.
- */
+// critério com ratio null não se aplica e sai do denominador
 export function assessQuality(input: QualityInput): QualitySection {
   const { files, units, techs, secrets, isApi, isSnippet } = input;
   const checks: QualityCheck[] = [];
@@ -78,7 +74,6 @@ export function assessQuality(input: QualityInput): QualitySection {
     return status;
   };
 
-  // 1) Segredos expostos ---------------------------------------------------
   if (secrets.length === 0) {
     check(
       'secrets',
@@ -110,7 +105,6 @@ export function assessQuality(input: QualityInput): QualitySection {
     });
   }
 
-  // 2) Testes ---------------------------------------------------------------
   if (isSnippet)
     check(
       'tests',
@@ -158,7 +152,6 @@ export function assessQuality(input: QualityInput): QualitySection {
       );
   }
 
-  // 3) Tamanho das funções --------------------------------------------------
   if (prodUnits.length === 0)
     check(
       'function-size',
@@ -192,7 +185,6 @@ export function assessQuality(input: QualityInput): QualitySection {
       );
   }
 
-  // 4) Complexidade ---------------------------------------------------------
   if (prodUnits.length === 0)
     check(
       'complexity',
@@ -226,7 +218,6 @@ export function assessQuality(input: QualityInput): QualitySection {
     }
   }
 
-  // 5) README -----------------------------------------------------------------
   const readme = files.find(
     (f) =>
       /^readme(\.\w+)?$/i.test(basename(f.path)) &&
@@ -278,7 +269,6 @@ export function assessQuality(input: QualityInput): QualitySection {
     else strengths.push('O README explica o projeto e como executá-lo.');
   }
 
-  // 6) Tipagem ----------------------------------------------------------------
   const STATIC = [
     'TypeScript',
     'Java',
@@ -336,7 +326,6 @@ export function assessQuality(input: QualityInput): QualitySection {
     });
   } else check('typing', 'Tipagem', 7, 0.6, 'Linguagem dinâmica.');
 
-  // 7) Lint / formatação ------------------------------------------------------
   const lint =
     hasFile(
       /(^|\/)(\.eslintrc[\w.]*|eslint\.config\.\w+|\.oxlintrc\.json|biome\.json|\.prettierrc[\w.]*|prettier\.config\.\w+|\.editorconfig|ruff\.toml|\.flake8|\.pylintrc|checkstyle\.xml|\.rubocop\.yml|\.golangci\.ya?ml|rustfmt\.toml)$/,
@@ -388,7 +377,6 @@ export function assessQuality(input: QualityInput): QualitySection {
     });
   }
 
-  // 8) Tamanho dos arquivos ---------------------------------------------------
   const bigFiles = sourceFiles.filter((f) => countLines(f.content) > 400);
   if (sourceFiles.length === 0)
     check('file-size', 'Arquivos com tamanho razoável', 5, null, 'Sem código.');
@@ -410,7 +398,6 @@ export function assessQuality(input: QualityInput): QualitySection {
       });
   }
 
-  // 9) Tratamento de erros ----------------------------------------------------
   const errorHandling = sourceFiles.some((f) =>
     /\btry\s*[{:]|\bcatch\b|\bexcept\b|\brescue\b|throw new|raise \w|if err != nil|ExceptionFilter|@ControllerAdvice|errorHandler/.test(
       f.content,
@@ -442,7 +429,6 @@ export function assessQuality(input: QualityInput): QualitySection {
     });
   }
 
-  // 10) Validação de entrada (só para APIs) -----------------------------------
   if (!isApi)
     check(
       'validation',
@@ -488,7 +474,6 @@ export function assessQuality(input: QualityInput): QualitySection {
       });
   }
 
-  // 11) Restos de depuração ---------------------------------------------------
   let debugCount = 0;
   let debugExample = '';
   for (const f of sourceFiles) {
@@ -515,7 +500,6 @@ export function assessQuality(input: QualityInput): QualitySection {
       priority: 'baixa',
     });
 
-  // 12) TODO/FIXME ------------------------------------------------------------
   const todos = sourceFiles.reduce(
     (s, f) => s + (f.content.match(/\b(TODO|FIXME|HACK|XXX)\b/g)?.length ?? 0),
     0,
@@ -535,7 +519,6 @@ export function assessQuality(input: QualityInput): QualitySection {
       priority: 'baixa',
     });
 
-  // 13) .gitignore e configuração por ambiente --------------------------------
   if (isSnippet)
     check(
       'config',
@@ -580,7 +563,6 @@ export function assessQuality(input: QualityInput): QualitySection {
       });
   }
 
-  // 14) CI e 15) Docker -------------------------------------------------------
   if (isSnippet) {
     check(
       'ci',
@@ -637,7 +619,6 @@ export function assessQuality(input: QualityInput): QualitySection {
       });
   }
 
-  // ---------------------------------------------------------------- Nota
   const applicable = checks.filter((c) => c.status !== 'na');
   const total = applicable.reduce((s, c) => s + c.weight, 0) || 1;
   const earned = applicable.reduce((s, c) => s + c.earned, 0);

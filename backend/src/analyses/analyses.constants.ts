@@ -1,6 +1,5 @@
 export const ANALYSIS_QUEUE = 'analysis';
 
-/** Quantas análises a mesma pessoa pode ter na fila ao mesmo tempo. */
 export const MAX_PENDING_PER_USER = 3;
 
 export type AnalysisSource =

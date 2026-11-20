@@ -1,10 +1,5 @@
-/**
- * Tipos do motor de análise. O motor é TypeScript puro (não depende do
- * NestJS), então pode ser testado isoladamente e reaproveitado (ex.: numa CLI).
- */
-
 export interface SourceFile {
-  /** Caminho relativo e normalizado, sempre com "/" (ex.: src/app.ts). */
+  // relativo, sempre com "/"
   path: string;
   content: string;
 }
@@ -43,11 +38,8 @@ export interface Technology {
   name: string;
   version?: string;
   category: TechCategory;
-  /** Para que serve, em linguagem simples. */
   description: string;
-  /** Possível motivo de o autor ter escolhido essa tecnologia. */
   why: string;
-  /** Onde foi encontrada (ex.: package.json, import em src/x.py). */
   source: string;
 }
 
@@ -133,12 +125,10 @@ export interface AnalysisMeta {
   skippedFiles: number;
 }
 
-/** Presente apenas quando o modo IA foi usado com sucesso. */
+// só existe quando a IA rodou com sucesso
 export interface AiInsights {
   model: string;
-  /** Recado final de mentor, em tom encorajador. */
   mentorNote: string;
-  /** Sugestões extras que a análise estática não consegue perceber. */
   extraSuggestions: string[];
 }
 
