@@ -4,12 +4,14 @@ import { ConfigService } from '@nestjs/config';
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Env } from '../config/env.js';
+import { AiModule } from '../ai/ai.module.js';
 import { IngestionModule } from '../ingestion/ingestion.module.js';
 import { ANALYSIS_QUEUE } from './analyses.constants.js';
 import { AnalysesController } from './analyses.controller.js';
 import { AnalysesRepository } from './analyses.repository.js';
 import { AnalysesService } from './analyses.service.js';
 import { AnalysisProcessor } from './analysis.processor.js';
+import { MetaController } from './meta.controller.js';
 
 @Module({
   imports: [
@@ -29,8 +31,9 @@ import { AnalysisProcessor } from './analysis.processor.js';
       }),
     }),
     IngestionModule,
+    AiModule,
   ],
-  controllers: [AnalysesController],
+  controllers: [AnalysesController, MetaController],
   providers: [AnalysesService, AnalysesRepository, AnalysisProcessor],
 })
 export class AnalysesModule {}

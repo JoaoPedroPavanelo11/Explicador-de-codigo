@@ -10,6 +10,7 @@ import {
 import { renderMarkdown } from '../analyzer/engine/report.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { IngestionService } from '../ingestion/ingestion.service.js';
+import { AiExplainerService } from '../ai/ai-explainer.service.js';
 import { AnalysesRepository } from './analyses.repository.js';
 import { ANALYSIS_QUEUE, type AnalysisJobData } from './analyses.constants.js';
 
@@ -24,6 +25,7 @@ export class AnalysisProcessor extends WorkerHost {
   constructor(
     private readonly analyses: AnalysesRepository,
     private readonly ingestion: IngestionService,
+    private readonly ai: AiExplainerService,
   ) {
     super();
   }
@@ -40,7 +42,17 @@ export class AnalysisProcessor extends WorkerHost {
 
     try {
       const input = await this.ingest(job.data);
-      const result = analyzeProject(input.files, input.skipped);
+      let result = analyzeProject(input.files, input.skipped);
+      if (analysis.useAi && this.ai.isEnabled) {
+        try {
+          result = await this.ai.enhance(result);
+        } catch (error) {
+          // A IA é um bônus: se falhar, entregamos a análise estática normalmente.
+          this.logger.warn(
+            `IA indisponível para ${analysisId}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
       const reportMd = renderMarkdown(result, analysis.title);
 
       await this.analyses.markDone(analysisId, {
