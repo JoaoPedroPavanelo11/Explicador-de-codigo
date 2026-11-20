@@ -1,0 +1,31 @@
+# Dependências
+node_modules/
+
+# Build
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Ambiente (NUNCA versionar segredos)
+.env
+.env.*
+!.env.example
+
+# Prisma (cliente gerado)
+backend/src/generated/
+
+# Uploads temporários
+backend/tmp/
+tmp/
+
+# Logs e SO
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/*
+!.vscode/extensions.json
+.idea/
