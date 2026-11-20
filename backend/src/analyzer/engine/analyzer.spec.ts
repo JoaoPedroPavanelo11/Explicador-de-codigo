@@ -87,3 +87,19 @@ describe('analyzeProject (trecho isolado)', () => {
     expect(r.idea.endpoints[0]).toMatchObject({ method: 'GET', path: '/ping' });
   });
 });
+
+describe('leitura do README', () => {
+  it('usa o parágrafo de introdução mesmo dentro de citação e ignora instruções', () => {
+    const r = analyzeProject([
+      {
+        path: 'README.md',
+        content:
+          '# ![Minha API](logo.png)\n\n> ### Uma API de exemplo com autenticação, artigos e comentários.\n\nRode o comando abaixo para instalar as dependências:\n\n```\nnpm i\n```\n',
+      },
+      { path: 'src/app.ts', content: 'export const app = 1;\n' },
+    ]);
+    expect(r.idea.projectName).toBe('Minha API');
+    expect(r.idea.summary).toContain('Uma API de exemplo com autenticação');
+    expect(r.idea.summary).not.toContain('Rode o comando');
+  });
+});
