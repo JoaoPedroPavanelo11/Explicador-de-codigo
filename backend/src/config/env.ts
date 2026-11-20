@@ -26,7 +26,8 @@ export const envSchema = z.object({
   JWT_SECRET: z
     .string()
     .min(32, 'JWT_SECRET precisa ter pelo menos 32 caracteres'),
-  JWT_TTL: z.string().default('1h'),
+  JWT_TTL: z.string().default('15m'),
+  REFRESH_TTL: z.string().default('7d'),
 
   // Rate limiting (requisições por minuto, por usuário ou IP)
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
