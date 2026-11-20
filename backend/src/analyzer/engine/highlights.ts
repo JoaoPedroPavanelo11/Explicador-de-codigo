@@ -377,13 +377,11 @@ function buildHighlight(
         : 'É um bom ponto de partida para entender como o projeto funciona por dentro.',
     );
 
+  // As observações aparecem em lista logo abaixo; aqui fica só o objetivo.
   const whatItDoes = unit
     ? `A função \`${unit.name}\` (linhas ${unit.startLine}–${unit.endLine} de \`${file.path}\`) tem como objetivo ${describeName(unit.name)}.` +
       (observations.length
-        ? ` Olhando a implementação: ${observations
-            .slice(0, 3)
-            .map((o) => o.replace(/\.$/, '').toLowerCase())
-            .join('; ')}.`
+        ? ' Veja abaixo o que chama atenção na implementação.'
         : '')
     : `Este arquivo (\`${file.path}\`, ${countLines(file.content)} linhas) tem o papel de **${role.label.toLowerCase()}** no projeto.`;
 
