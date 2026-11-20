@@ -1,26 +1,18 @@
 import type { TechCategory } from './types.js';
 
-/**
- * Base de conhecimento: cada entrada liga um pacote (de qualquer ecossistema)
- * a uma explicação do que ele faz e do motivo provável de ter sido escolhido.
- *
- * Chaves: "<ecossistema>:<nome>". Ecossistemas: npm, pypi, maven, go, cargo,
- * composer, gem, nuget, pub, docker. Um "*" no final casa por prefixo.
- *
- * Quer ensinar o explicador a reconhecer uma tecnologia nova? Adicione aqui.
- */
+// chave = "<ecossistema>:<pacote>" (npm, pypi, maven, go, cargo, composer,
+// gem, nuget, pub, docker). "*" no final casa por prefixo.
 export interface CatalogEntry {
   keys: string[];
   name: string;
   category: TechCategory;
   description: string;
   why: string;
-  /** Funcionalidade que a presença do pacote sugere (usada na seção "Ideia"). */
+  // usado na lista de funcionalidades da seção "ideia"
   feature?: string;
 }
 
 export const CATALOG: CatalogEntry[] = [
-  // ---------------------------------------------------------------- Backend
   {
     keys: ['npm:@nestjs/core'],
     name: 'NestJS',
@@ -215,7 +207,6 @@ export const CATALOG: CatalogEntry[] = [
     description: 'ORM oficial do .NET.',
     why: 'Mapeia classes C# para tabelas e gera migrations.',
   },
-  // --------------------------------------------------------------- Frontend
   {
     keys: ['npm:react'],
     name: 'React',
@@ -321,7 +312,6 @@ export const CATALOG: CatalogEntry[] = [
     description: 'Framework CSS com grid e componentes prontos.',
     why: 'Layout responsivo rápido.',
   },
-  // ------------------------------------------------------- Build / Linguagem
   {
     keys: ['npm:typescript'],
     name: 'TypeScript',
@@ -351,7 +341,6 @@ export const CATALOG: CatalogEntry[] = [
     description: 'Executam e recarregam o projeto durante o desenvolvimento.',
     why: 'Agilizam o ciclo de editar e testar.',
   },
-  // ---------------------------------------------------------- Banco / ORM
   {
     keys: ['npm:prisma', 'npm:@prisma/client'],
     name: 'Prisma',
@@ -490,7 +479,6 @@ export const CATALOG: CatalogEntry[] = [
     why: 'Respostas em microssegundos; alivia o banco principal.',
     feature: 'Cache e dados em memória',
   },
-  // ---------------------------------------------------------- Filas
   {
     keys: ['npm:bullmq', 'npm:bull', 'npm:@nestjs/bullmq', 'npm:@nestjs/bull'],
     name: 'BullMQ',
@@ -534,7 +522,6 @@ export const CATALOG: CatalogEntry[] = [
     why: 'Processa grandes volumes de eventos com durabilidade.',
     feature: 'Streaming de eventos',
   },
-  // ---------------------------------------------------------- Auth
   {
     keys: [
       'npm:jsonwebtoken',
@@ -612,7 +599,6 @@ export const CATALOG: CatalogEntry[] = [
     why: 'Login social pronto em poucas linhas.',
     feature: 'Login com provedores externos',
   },
-  // ---------------------------------------------------------- Validação
   {
     keys: ['npm:zod'],
     name: 'Zod',
@@ -641,7 +627,6 @@ export const CATALOG: CatalogEntry[] = [
     description: 'Validação de dados com type hints em Python.',
     why: 'Valida e converte dados automaticamente (base do FastAPI).',
   },
-  // ---------------------------------------------------------- Testes
   {
     keys: ['npm:jest', 'npm:ts-jest'],
     name: 'Jest',
@@ -723,7 +708,6 @@ export const CATALOG: CatalogEntry[] = [
     description: 'Frameworks de testes .NET.',
     why: 'Padrão para testes em C#.',
   },
-  // ---------------------------------------------------------- Qualidade
   {
     keys: ['npm:eslint'],
     name: 'ESLint',
@@ -779,7 +763,6 @@ export const CATALOG: CatalogEntry[] = [
     description: 'Lint, formatação e checagem de tipos em Python.',
     why: 'Código Python consistente e com menos bugs.',
   },
-  // ---------------------------------------------------------- HTTP/Integrações
   {
     keys: ['npm:axios', 'pypi:requests', 'pypi:httpx'],
     name: 'Cliente HTTP',
@@ -907,7 +890,6 @@ export const CATALOG: CatalogEntry[] = [
     why: 'Abstrai a API do mensageiro.',
     feature: 'Bot de mensagens',
   },
-  // ---------------------------------------------------------- IA e dados
   {
     keys: ['npm:@anthropic-ai/sdk', 'pypi:anthropic'],
     name: 'Claude API (Anthropic SDK)',
@@ -968,7 +950,6 @@ export const CATALOG: CatalogEntry[] = [
     why: 'Loop de jogo, sprites e colisões prontos.',
     feature: 'Jogo interativo',
   },
-  // ---------------------------------------------------------- Infra
   {
     keys: ['docker:nginx'],
     name: 'Nginx',
@@ -990,7 +971,6 @@ function matches(key: string, pkgKey: string): boolean {
   return key === pkgKey;
 }
 
-/** Procura no catálogo um pacote como "npm:express" ou "pypi:Django". */
 export function findInCatalog(pkgKey: string): CatalogEntry | undefined {
   const normalized = pkgKey.toLowerCase();
   return CATALOG.find((e) =>

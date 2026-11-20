@@ -12,7 +12,6 @@ import { extractZip, stripCommonRoot } from './zip-extractor.js';
 
 const MB = 1024 * 1024;
 
-/** Transforma qualquer origem (colado, .zip, GitHub) numa lista de arquivos analisáveis. */
 @Injectable()
 export class IngestionService {
   private readonly limits: IngestLimits;

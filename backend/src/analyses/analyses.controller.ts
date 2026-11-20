@@ -35,7 +35,6 @@ import {
 export class AnalysesController {
   constructor(private readonly analyses: AnalysesService) {}
 
-  /** Analisa código colado no editor (um ou vários arquivos). */
   @Post('paste')
   @HttpCode(202)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
@@ -46,7 +45,6 @@ export class AnalysesController {
     return this.analyses.fromPaste(user.id, body);
   }
 
-  /** Analisa um projeto enviado como .zip (multipart/form-data, campo "file"). */
   @Post('upload')
   @HttpCode(202)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
@@ -59,7 +57,6 @@ export class AnalysesController {
     return this.analyses.fromUpload(user.id, file, fields);
   }
 
-  /** Analisa um repositório público do GitHub. */
   @Post('github')
   @HttpCode(202)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
@@ -86,7 +83,7 @@ export class AnalysesController {
     return this.analyses.get(user.id, id);
   }
 
-  /** Download do relatório em Markdown (sempre como anexo, nunca renderizado). */
+  // sempre como anexo, o navegador não renderiza o markdown
   @Get(':id/report')
   @Header('Content-Type', 'text/markdown; charset=utf-8')
   async report(

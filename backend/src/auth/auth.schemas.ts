@@ -9,8 +9,7 @@ const email = z
 export const registerSchema = z.strictObject({
   name: z.string().trim().min(2, 'Nome muito curto').max(80),
   email,
-  // Regras de força valem só no cadastro (não no login), para não travar
-  // quem criou a senha sob regras antigas.
+  // regras de força só no cadastro, para não travar senhas antigas no login
   password: z
     .string()
     .min(8, 'A senha precisa ter pelo menos 8 caracteres')

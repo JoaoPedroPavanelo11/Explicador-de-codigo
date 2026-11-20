@@ -8,10 +8,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import type { Env } from '../config/env.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 
-/**
- * Um único PrismaClient para a aplicação inteira (cada client tem seu
- * próprio pool de conexões — criar vários esgota o banco).
- */
+// um client só: cada instância abre seu próprio pool
 @Injectable()
 export class PrismaService
   extends PrismaClient

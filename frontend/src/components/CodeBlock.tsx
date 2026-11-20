@@ -5,7 +5,6 @@ interface Props {
   language: string
 }
 
-/** Bloco de código monocromático com numeração de linhas real do arquivo. */
 export function CodeBlock({ code, startLine, file, language }: Props) {
   const lines = code.replace(/\n$/, '').split('\n')
   return (

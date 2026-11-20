@@ -11,14 +11,7 @@ import type { AnalysisResult, SourceFile, StackSection } from './types.js';
 
 export const ENGINE_VERSION = '1.0.0';
 
-/**
- * Pipeline completo de análise estática:
- *
- *   arquivos → manifestos → stack → arquitetura → ideia → destaques → nota
- *
- * Tudo é determinístico (a mesma entrada gera o mesmo resultado) e roda
- * sem internet. A IA, quando ativada, só reescreve os textos depois.
- */
+// determinístico e offline. A IA (opcional) só reescreve texto depois, nunca a nota.
 export function analyzeProject(
   files: SourceFile[],
   skippedFiles = 0,

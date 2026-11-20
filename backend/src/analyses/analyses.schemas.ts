@@ -3,7 +3,7 @@ import { z } from 'zod';
 const MAX_PASTE_BYTES = 2 * 1024 * 1024;
 
 const title = z.string().trim().min(1).max(120).optional();
-// Campos de formulário multipart chegam como texto: "true"/"false".
+// no multipart o boolean chega como "true"/"false"
 const useAi = z.union([z.boolean(), z.stringbool()]).default(false);
 
 export const pasteSchema = z

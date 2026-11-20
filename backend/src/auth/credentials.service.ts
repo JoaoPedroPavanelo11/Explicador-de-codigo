@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PasswordHasher } from '@nestjs/authentication';
-import {
-  UsersRepository,
-  type PublicUser,
-} from '../users/users.repository.js';
+import { UsersRepository, type PublicUser } from '../users/users.repository.js';
 import type { RegisterInput } from './auth.schemas.js';
 
 @Injectable()
@@ -22,13 +19,8 @@ export class CredentialsService {
     });
   }
 
-  /**
-   * Retorna o usuário, ou null se e-mail OU senha estiverem errados.
-   *
-   * Segurança: mesmo quando o e-mail não existe, verify() compara a senha com
-   * um hash "falso". Assim o tempo de resposta é o mesmo nos dois casos e
-   * ninguém consegue descobrir quais e-mails estão cadastrados (timing attack).
-   */
+  // verify() roda mesmo sem usuário (compara com hash dummy), então o tempo de
+  // resposta não entrega quais e-mails existem. Não retornar antes disso.
   async verify(email: string, password: string): Promise<PublicUser | null> {
     const found = await this.users.findCredentials(email);
     const valid = await this.passwordHasher.verify(
@@ -37,7 +29,7 @@ export class CredentialsService {
     );
     if (!valid || !found) return null;
 
-    // Se o custo do hash aumentou desde o cadastro, atualiza o hash agora.
+    // custo do hash subiu desde o cadastro
     if (this.passwordHasher.needsRehash(found.passwordHash)) {
       await this.users.updatePasswordHash(
         found.user.id,

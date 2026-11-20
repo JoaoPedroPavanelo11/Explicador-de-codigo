@@ -7,7 +7,6 @@ import { redactSecrets } from '../analyzer/engine/secrets.js';
 import type { AnalysisResult } from '../analyzer/engine/types.js';
 import type { Env } from '../config/env.js';
 
-/** O formato exato que pedimos ao modelo (structured outputs). */
 const AiOutput = z.object({
   ideaSummary: z.string(),
   audience: z.string(),
@@ -43,11 +42,7 @@ function clip(text: string, max: number): string {
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
-/**
- * Enriquecimento opcional com IA (Claude). A análise estática continua
- * sendo a fonte da verdade — a nota, por exemplo, nunca muda. A IA só
- * reescreve os textos explicativos para ficarem mais naturais e profundos.
- */
+// a IA só reescreve textos. A nota continua vindo da análise estática.
 @Injectable()
 export class AiExplainerService {
   private readonly logger = new Logger(AiExplainerService.name);
@@ -66,7 +61,7 @@ export class AiExplainerService {
     return this.client !== null;
   }
 
-  /** Monta o contexto enviado ao modelo: só um resumo + trechos já mascarados. */
+  // só resumo + trechos já mascarados, nunca o projeto inteiro
   buildContext(result: AnalysisResult): string {
     const { idea, stack, highlights, quality } = result;
     const lines: string[] = [];
@@ -112,7 +107,6 @@ export class AiExplainerService {
     const response = await this.client.beta.messages.parse({
       model: this.model,
       max_tokens: 16000,
-      // Se o modelo principal recusar, a API tenta um modelo de fallback.
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
       system: SYSTEM_PROMPT,
@@ -137,7 +131,6 @@ export class AiExplainerService {
     return this.merge(result, response.parsed_output, response.model);
   }
 
-  /** Aplica a resposta da IA por cima do resultado, com limites de tamanho. */
   merge(result: AnalysisResult, ai: AiOutput, model: string): AnalysisResult {
     const highlights = result.highlights.map((h, index) => {
       const enhanced = ai.highlights.find((x) => x.index === index);

@@ -10,10 +10,7 @@ interface Domain {
   audience: string;
 }
 
-/**
- * Domínios de negócio e as palavras (em inglês e português) que costumam
- * aparecer em nomes de arquivos, classes, rotas e no README.
- */
+// palavras em pt e en, procuradas em caminhos, declarações, rotas e README
 const DOMAINS: Domain[] = [
   {
     id: 'banking',
@@ -464,7 +461,7 @@ const DOMAINS: Domain[] = [
   },
 ];
 
-/** Separa identificadores em palavras: createTransfer → create, transfer. */
+// createTransfer -> ['create', 'transfer']
 export function splitWords(text: string): string[] {
   return text
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -484,10 +481,9 @@ function collectVocabulary(
     freq.set(w, (freq.get(w) ?? 0) + weight);
   for (const f of files) {
     if (isAuxiliaryPath(f.path)) continue;
-    // Caminhos e nomes de arquivos pesam mais: refletem a intenção do autor.
+    // nome de arquivo diz mais sobre a intenção do que o conteúdo
     for (const w of splitWords(f.path)) add(w, 3);
     if (!languageOf(f.path)) continue;
-    // Declarações de classes, funções e tabelas.
     for (const m of f.content.matchAll(
       /\b(?:class|interface|model|table|entity|def|function|type|struct|enum)\s+([A-Za-z_]\w*)/g,
     ))
@@ -505,7 +501,6 @@ function readReadme(files: SourceFile[]): {
     .filter((f) => /^readme(\.md|\.txt|\.rst)?$/i.test(basename(f.path)))
     .sort((a, b) => a.path.split('/').length - b.path.split('/').length)[0];
   if (!readme) return {};
-  // Remove sintaxe Markdown: imagens viram o texto alternativo e links, o texto.
   const plain = (text: string) =>
     text
       .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
@@ -518,10 +513,10 @@ function readReadme(files: SourceFile[]): {
   const title = titleLine
     ? plain(titleLine.replace(/^#\s+/, '')) || undefined
     : undefined;
-  // Primeiro parágrafo de texto "de verdade" (sem badges, títulos ou HTML).
+  // primeiro parágrafo de texto (pula badges, títulos, html, código)
   const paragraph = readme.content
     .split(/\n\s*\n/)
-    // Em citações ("> ### Sobre o projeto ..."), o título faz parte do texto.
+    // alguns READMEs abrem com "> ### descrição"
     .map((p) =>
       p.startsWith('>')
         ? p
@@ -540,7 +535,7 @@ function readReadme(files: SourceFile[]): {
         !p.startsWith('```') &&
         !p.startsWith('|') &&
         !p.startsWith('-') &&
-        // "Rode o comando abaixo:" é instrução, não descrição.
+        // "rode o comando abaixo:" não é descrição
         !p.trimEnd().endsWith(':') &&
         plain(p).length > 40,
     );
@@ -556,7 +551,6 @@ function readReadme(files: SourceFile[]): {
   };
 }
 
-/** Rotas HTTP declaradas nos frameworks mais comuns. */
 export function extractEndpoints(files: SourceFile[]): Endpoint[] {
   const out: Endpoint[] = [];
   const push = (method: string, path: string, file: string) => {
@@ -567,13 +561,13 @@ export function extractEndpoints(files: SourceFile[]): Endpoint[] {
   for (const f of files) {
     const lang = languageOf(f.path);
     if (!lang || isAuxiliaryPath(f.path)) continue;
-    // Ignora linhas de comentário para não confundir exemplos com rotas reais.
+    // sem comentários, senão exemplos em docstring viram rota
     const c = f.content
       .split('\n')
       .filter((l) => !/^\s*(\/\/|\*|\/\*|#(?!\[))/.test(l))
       .join('\n');
 
-    // NestJS: @Controller('x') + @Get(':id')
+    // nest
     const nestPrefix = c.match(/@Controller\(\s*(?:['"`]([^'"`]*)['"`])?/);
     if (nestPrefix) {
       for (const m of c.matchAll(
@@ -586,7 +580,7 @@ export function extractEndpoints(files: SourceFile[]): Endpoint[] {
         );
       continue;
     }
-    // Spring: @RequestMapping("/x") + @GetMapping("/y")
+    // spring
     if (lang === 'Java' || lang === 'Kotlin') {
       const prefix =
         c.match(
@@ -598,7 +592,7 @@ export function extractEndpoints(files: SourceFile[]): Endpoint[] {
         push(m[1].toUpperCase(), `${prefix}/${m[2] ?? ''}`, f.path);
       continue;
     }
-    // ASP.NET: [Route("api/[controller]")] + [HttpGet("{id}")]
+    // asp.net
     if (lang === 'C#') {
       const ctrl = basename(f.path)
         .replace(/Controller\.cs$/, '')
@@ -613,12 +607,12 @@ export function extractEndpoints(files: SourceFile[]): Endpoint[] {
         push(m[1].toUpperCase(), `${prefix}/${m[2] ?? ''}`, f.path);
       continue;
     }
-    // Express / Fastify / Koa / Hono: app.get('/x', ...) / router.post(...)
+    // express, fastify, koa, hono
     for (const m of c.matchAll(
       /\b(?:app|router|server|fastify|api|routes|r)\.(get|post|put|patch|delete)\(\s*['"`]([^'"`]+)['"`]/g,
     ))
       push(m[1].toUpperCase(), m[2], f.path);
-    // FastAPI / Flask: @app.get('/x') / @bp.route('/x', methods=['POST'])
+    // fastapi, flask
     for (const m of c.matchAll(
       /@\w+\.(get|post|put|patch|delete)\(\s*['"]([^'"]+)['"]/g,
     ))
@@ -631,16 +625,13 @@ export function extractEndpoints(files: SourceFile[]): Endpoint[] {
         : ['GET'];
       for (const method of methods) push(method, m[1], f.path);
     }
-    // Django: path('users/', views.x)
     if (basename(f.path) === 'urls.py')
       for (const m of c.matchAll(/\bpath\(\s*['"]([^'"]*)['"]/g))
         push('ANY', m[1], f.path);
-    // Laravel: Route::get('/x', ...)
     for (const m of c.matchAll(
       /Route::(get|post|put|patch|delete)\(\s*['"]([^'"]+)['"]/g,
     ))
       push(m[1].toUpperCase(), m[2], f.path);
-    // Go (gin/echo/fiber/chi): r.GET("/x", ...)
     if (lang === 'Go')
       for (const m of c.matchAll(
         /\.(GET|POST|PUT|PATCH|DELETE|Get|Post|Put|Patch|Delete)\(\s*"([^"]+)"/g,
@@ -651,7 +642,7 @@ export function extractEndpoints(files: SourceFile[]): Endpoint[] {
   return out.slice(0, 60);
 }
 
-/** Recursos REST principais a partir das rotas: /api/accounts/:id → accounts. */
+// /api/accounts/:id -> accounts
 function resourcesFrom(endpoints: Endpoint[]): string[] {
   const counts = new Map<string, number>();
   for (const e of endpoints) {
@@ -777,7 +768,6 @@ export function analyzeIdea(
   const vocab = collectVocabulary(files, endpoints);
   const readme = readReadme(files);
 
-  // Pontua cada domínio pela frequência das suas palavras-chave.
   const readmeWords = new Set(
     splitWords(
       `${readme.title ?? ''} ${readme.paragraph ?? ''} ${manifest.description ?? ''}`,
@@ -817,7 +807,6 @@ export function analyzeIdea(
     .slice(0, 4);
   const mainLang = techs.find((t) => t.category === 'Linguagem')?.name;
 
-  // ---------------------------------------------------------- Resumo
   const parts: string[] = [];
   parts.push(
     `Pelo que li, **${projectName}** é ${type.article} **${type.type}**` +
@@ -845,7 +834,6 @@ export function analyzeIdea(
           : '.'),
     );
 
-  // ---------------------------------------------------------- Funcionalidades
   const features = new Set<string>();
   for (const r of resources.slice(0, 6)) {
     const methods = new Set(
@@ -869,7 +857,6 @@ export function analyzeIdea(
   )
     features.add('Cadastro e login de usuários');
 
-  // ---------------------------------------------------------- Público
   const audience = best
     ? `Serve para ${best.d.audience}. Na prática, quem usa diretamente este código são ${type.audienceHint}.`
     : `Serve para ${type.audienceHint}.`;

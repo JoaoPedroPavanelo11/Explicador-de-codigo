@@ -34,13 +34,12 @@ export class HealthController {
     private readonly database: DatabaseHealthIndicator,
   ) {}
 
-  /** Liveness: responde se o processo está de pé (sem checar dependências). */
   @Get('health')
   live() {
     return { status: 'ok' };
   }
 
-  /** Readiness: só fica "ok" quando o banco responde. Usado pelo Docker. */
+  // usado pelo healthcheck do docker
   @Get('ready')
   @HealthCheck()
   ready() {

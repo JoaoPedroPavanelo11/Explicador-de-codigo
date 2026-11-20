@@ -3,7 +3,6 @@ interface Props {
   level: string
 }
 
-/** A nota em destaque, com uma régua de 0 a 10. */
 export function ScoreMeter({ score, level }: Props) {
   return (
     <div className="score">

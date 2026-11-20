@@ -4,11 +4,8 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import type { Env } from '../config/env.js';
 
-/**
- * Rate limiting global. Importado DEPOIS do AuthModule: os guards globais
- * rodam na ordem dos módulos, então aqui o usuário já está identificado e
- * cada pessoa tem seu próprio limite (anônimos são contados por IP).
- */
+// tem que ser importado depois do AuthModule (guards globais rodam na ordem
+// dos módulos), senão req.user ainda não existe e tudo conta por IP
 @Module({
   imports: [
     ThrottlerModule.forRootAsync({

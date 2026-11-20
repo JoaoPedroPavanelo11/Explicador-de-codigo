@@ -1,6 +1,5 @@
 import type { LanguageStat, SourceFile } from './types.js';
 
-/** Extensão → linguagem. Só entram nas estatísticas linguagens "de código". */
 const CODE_LANGUAGES: Record<string, string> = {
   ts: 'TypeScript',
   tsx: 'TypeScript',
@@ -47,7 +46,7 @@ const CODE_LANGUAGES: Record<string, string> = {
   ipynb: 'Jupyter Notebook',
 };
 
-/** Arquivos de texto que lemos, mas que não contam como "código". */
+// lidos, mas fora das estatísticas de linguagem
 const TEXT_EXTENSIONS = new Set([
   'json',
   'yml',
@@ -82,7 +81,6 @@ const TEXT_EXTENSIONS = new Set([
   'rst',
 ]);
 
-/** Arquivos sem extensão que reconhecemos pelo nome. */
 const KNOWN_FILENAMES = new Set([
   'dockerfile',
   'makefile',
@@ -116,7 +114,6 @@ export function languageOf(path: string): string | null {
   return CODE_LANGUAGES[extensionOf(path)] ?? null;
 }
 
-/** Decide se vale a pena ler o arquivo (texto conhecido). */
 export function isReadableFile(path: string): boolean {
   const base = basename(path).toLowerCase();
   if (KNOWN_FILENAMES.has(base) || base.startsWith('.env')) return true;
@@ -132,7 +129,6 @@ export function countLines(content: string): number {
   return n;
 }
 
-/** Linguagens mais usadas, por linhas de código. */
 export function languageStats(files: SourceFile[]): LanguageStat[] {
   const map = new Map<string, { files: number; lines: number }>();
   for (const f of files) {
@@ -154,11 +150,7 @@ export function languageStats(files: SourceFile[]): LanguageStat[] {
     .sort((a, b) => b.lines - a.lines);
 }
 
-/**
- * Arquivos que não representam o código "de produção": testes, fixtures,
- * mocks, exemplos, migrations e código gerado. Eles não devem influenciar
- * a ideia do projeto nem aparecer como destaques.
- */
+// testes, fixtures, mocks, migrations, gerados... não contam como código do produto
 export function isAuxiliaryPath(path: string): boolean {
   return /(^|\/)(__tests__|__fixtures__|__mocks__|tests?|spec|fixtures?|mocks?|examples?|samples?|docs?|migrations?|generated|e2e|cypress|storybook|\.storybook)\/|\.(spec|test|stories|d)\.[a-z]+$|_test\.(go|py)$|(^|\/)test_\w+\.py$|Tests?\.(java|cs|kt)$/i.test(
     path,

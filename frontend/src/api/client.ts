@@ -1,11 +1,5 @@
-/**
- * Cliente HTTP da aplicação.
- *
- * - O access token fica APENAS em memória (nunca em localStorage), o que
- *   reduz o estrago de um eventual XSS.
- * - Quando a API responde 401, tentamos renovar a sessão uma única vez
- *   usando o cookie httpOnly de refresh e repetimos a requisição.
- */
+// access token só em memória (nada de localStorage). Em 401 tenta um refresh
+// pelo cookie e repete a request uma vez.
 
 export class ApiError extends Error {
   readonly status: number
@@ -33,13 +27,13 @@ async function readError(res: Response): Promise<string> {
     if (Array.isArray(body.message)) return body.message.join(' · ')
     if (body.message) return body.message
   } catch {
-    /* corpo vazio ou não-JSON */
+    // corpo vazio ou não-json
   }
   if (res.status === 429) return 'Muitas tentativas. Aguarde um minuto e tente de novo.'
   return 'Algo deu errado. Tente novamente.'
 }
 
-/** Renova o access token. Várias chamadas simultâneas compartilham a mesma renovação. */
+// requests simultâneas esperam o mesmo refresh
 export function refreshSession(): Promise<boolean> {
   refreshing ??= fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin' })
     .then(async (res) => {

@@ -27,7 +27,6 @@ import type {
   UploadFields,
 } from './analyses.schemas.js';
 
-/** Pasta dos .zip enviados enquanto aguardam processamento. */
 export const UPLOAD_DIR = join(process.cwd(), 'tmp', 'uploads');
 
 @Injectable()
@@ -83,7 +82,7 @@ export class AnalysesService {
   ) {
     if (!file || file.size === 0)
       throw new BadRequestException('Envie um arquivo .zip no campo "file"');
-    // Não confiamos na extensão nem no Content-Type: conferimos a assinatura do arquivo.
+    // extensão e content-type mentem, a assinatura do zip não
     if (
       !file.originalname.toLowerCase().endsWith('.zip') ||
       !isZip(file.buffer)
@@ -92,7 +91,6 @@ export class AnalysesService {
 
     await this.assertCanEnqueue(userId);
     await mkdir(UPLOAD_DIR, { recursive: true, mode: 0o700 });
-    // Nome aleatório: o nome original nunca vira caminho no disco.
     const tmpPath = join(UPLOAD_DIR, `${randomUUID()}.zip`);
     await writeFile(tmpPath, file.buffer, { mode: 0o600 });
     const safeName = file.originalname

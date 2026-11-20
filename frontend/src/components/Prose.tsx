@@ -1,10 +1,7 @@
 import Markdown from 'react-markdown'
 
-/**
- * Renderiza o Markdown simples dos textos do relatório (negrito, itálico,
- * `código`). O react-markdown NÃO interpreta HTML bruto por padrão — então
- * um texto malicioso vindo do código analisado não vira script na página.
- */
+// o texto pode vir do código analisado: react-markdown não renderiza HTML cru,
+// e ainda limitamos os elementos permitidos
 export function Prose({ children, inline = false }: { children: string; inline?: boolean }) {
   return (
     <div className="prose">
