@@ -1,4 +1,5 @@
 import { Controller, Get, Injectable } from '@nestjs/common';
+import { Public } from '@nestjs/authentication';
 import {
   HealthCheck,
   HealthCheckService,
@@ -23,6 +24,7 @@ export class DatabaseHealthIndicator {
   }
 }
 
+@Public()
 @Controller()
 export class HealthController {
   constructor(
