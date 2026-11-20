@@ -1,5 +1,6 @@
 import { Controller, Get, Injectable } from '@nestjs/common';
 import { Public } from '@nestjs/authentication';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   HealthCheck,
   HealthCheckService,
@@ -25,6 +26,7 @@ export class DatabaseHealthIndicator {
 }
 
 @Public()
+@SkipThrottle()
 @Controller()
 export class HealthController {
   constructor(
