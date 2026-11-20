@@ -1,7 +1,4 @@
-import {
-  ConsoleLogger,
-  StandardSchemaValidationPipe,
-} from '@nestjs/common';
+import { ConsoleLogger, StandardSchemaValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -25,6 +22,8 @@ async function bootstrap() {
   app.disable('x-powered-by'); // não anuncia que é Express
   app.enableShutdownHooks();
   app.use(cookieParser());
+  // Corpo JSON maior que o padrão (100 KB) para permitir colar código.
+  app.useBodyParser('json', { limit: '3mb' });
   // Valida body/query/params que declaram um schema Zod.
   app.useGlobalPipes(new StandardSchemaValidationPipe());
 
