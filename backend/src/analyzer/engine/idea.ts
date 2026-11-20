@@ -505,15 +505,23 @@ function readReadme(files: SourceFile[]): {
     .filter((f) => /^readme(\.md|\.txt|\.rst)?$/i.test(basename(f.path)))
     .sort((a, b) => a.path.split('/').length - b.path.split('/').length)[0];
   if (!readme) return {};
+  // Remove sintaxe Markdown: imagens viram o texto alternativo e links, o texto.
+  const plain = (text: string) =>
+    text
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/<[^>]+>/g, '')
+      .replace(/[*_`]/g, '')
+      .trim();
   const lines = readme.content.split('\n');
-  const title = lines
-    .find((l) => /^#\s+/.test(l))
-    ?.replace(/^#\s+/, '')
-    .trim();
+  const titleLine = lines.find((l) => /^#\s+/.test(l));
+  const title = titleLine
+    ? plain(titleLine.replace(/^#\s+/, '')) || undefined
+    : undefined;
   // Primeiro parágrafo de texto "de verdade" (sem badges, títulos ou HTML).
   const paragraph = readme.content
     .split(/\n\s*\n/)
-    .map((p) => p.trim())
+    .map((p) => p.replace(/^>\s*/gm, '').trim())
     .find(
       (p) =>
         p.length > 40 &&
@@ -522,16 +530,19 @@ function readReadme(files: SourceFile[]): {
         !p.startsWith('[![') &&
         !p.startsWith('![') &&
         !p.startsWith('```') &&
-        !p.startsWith('|'),
-    )
-    ?.replace(/^>\s*/gm, '')
-    .replace(/\s+/g, ' ');
+        !p.startsWith('|') &&
+        !p.startsWith('-') &&
+        plain(p).length > 40,
+    );
+  const cleanParagraph = paragraph
+    ? plain(paragraph).replace(/\s+/g, ' ')
+    : undefined;
   return {
     title,
     paragraph:
-      paragraph && paragraph.length > 400
-        ? `${paragraph.slice(0, 397)}...`
-        : paragraph,
+      cleanParagraph && cleanParagraph.length > 400
+        ? `${cleanParagraph.slice(0, 397)}...`
+        : cleanParagraph,
   };
 }
 
