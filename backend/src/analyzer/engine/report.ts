@@ -183,6 +183,18 @@ export function renderMarkdown(r: AnalysisResult, title: string): string {
     });
     out.push('');
   }
+  if (r.ai) {
+    out.push('### Comentário do mentor (IA)');
+    out.push('');
+    out.push(r.ai.mentorNote);
+    out.push('');
+    if (r.ai.extraSuggestions.length) {
+      out.push('**Outras ideias para evoluir o código:**');
+      out.push('');
+      for (const s of r.ai.extraSuggestions) out.push(`- ${s}`);
+      out.push('');
+    }
+  }
   out.push('<details><summary>Critérios da nota</summary>');
   out.push('');
   out.push('| | Critério | Pontos | Detalhe |');
