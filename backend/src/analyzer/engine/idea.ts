@@ -521,7 +521,15 @@ function readReadme(files: SourceFile[]): {
   // Primeiro parágrafo de texto "de verdade" (sem badges, títulos ou HTML).
   const paragraph = readme.content
     .split(/\n\s*\n/)
-    .map((p) => p.replace(/^>\s*/gm, '').trim())
+    // Em citações ("> ### Sobre o projeto ..."), o título faz parte do texto.
+    .map((p) =>
+      p.startsWith('>')
+        ? p
+            .replace(/^>\s*/gm, '')
+            .replace(/^#{1,6}\s+/, '')
+            .trim()
+        : p.trim(),
+    )
     .find(
       (p) =>
         p.length > 40 &&
@@ -532,6 +540,8 @@ function readReadme(files: SourceFile[]): {
         !p.startsWith('```') &&
         !p.startsWith('|') &&
         !p.startsWith('-') &&
+        // "Rode o comando abaixo:" é instrução, não descrição.
+        !p.trimEnd().endsWith(':') &&
         plain(p).length > 40,
     );
   const cleanParagraph = paragraph
