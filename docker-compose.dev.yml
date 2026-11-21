@@ -1,4 +1,9 @@
 # só postgres e redis; api e front rodam fora do docker em dev
+
+# Nome próprio: sem ele o compose usa o nome da pasta, igual ao do docker-compose.yml,
+# e um "up" aqui recriaria o postgres/redis da stack de produção com a config de dev.
+name: explicador-de-codigo-dev
+
 services:
   postgres:
     image: postgres:16-alpine
