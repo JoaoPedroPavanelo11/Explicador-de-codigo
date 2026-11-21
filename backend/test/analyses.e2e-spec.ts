@@ -1,16 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import { StandardSchemaValidationPipe } from '@nestjs/common';
-import type { INestApplication } from '@nestjs/common';
+import type {
+  INestApplication,
+  INestApplicationContext,
+} from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
+import { WorkerModule } from '../src/worker.module.js';
 
 // precisa do docker-compose.dev.yml rodando
 describe('Análises (e2e)', () => {
   let app: INestApplication<App>;
+  // a API só enfileira; sem o worker as análises ficariam QUEUED para sempre
+  let worker: INestApplicationContext;
   let tokenA: string;
   let tokenB: string;
 
@@ -36,12 +42,19 @@ describe('Análises (e2e)', () => {
     (app as NestExpressApplication).useBodyParser('json', { limit: '3mb' });
     app.useGlobalPipes(new StandardSchemaValidationPipe());
     await app.init();
+
+    const workerRef = await Test.createTestingModule({
+      imports: [WorkerModule],
+    }).compile();
+    worker = await workerRef.init();
+
     tokenA = await signUp('a');
     tokenB = await signUp('b');
   });
 
   afterAll(async () => {
-    await app.close();
+    await worker?.close();
+    await app?.close();
   });
 
   it('analisa código colado de forma assíncrona e entrega o relatório', async () => {

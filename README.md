@@ -111,7 +111,8 @@ O que o `docker compose` sobe:
 | Serviço | Para que serve | Porta exposta |
 |---|---|---|
 | `web` | Nginx servindo o React e repassando `/api` para a API | **8080** (a única) |
-| `api` | API NestJS + worker da fila de análises | — (rede interna) |
+| `api` | API NestJS: atende o site e enfileira as análises | — (rede interna) |
+| `worker` | Processa a fila: lê o código, roda o motor de análise e a IA | — (não recebe conexões) |
 | `migrate` | Aplica as migrations do banco e encerra | — |
 | `postgres` | Banco de dados (usuários e relatórios) | — (rede interna) |
 | `redis` | Fila de jobs (BullMQ) | — (rede interna) |
@@ -142,6 +143,9 @@ npm run start:dev
 
 A API sobe em `http://localhost:3000/api` e a documentação interativa (Swagger) em
 **`http://localhost:3000/api/docs`**.
+
+> Em desenvolvimento, `APP_ROLE=all` roda a API **e** o worker no mesmo processo, para você não
+> precisar de dois terminais. No Docker eles ficam em containers separados (veja [Arquitetura](#arquitetura)).
 
 **3. Rode o frontend** (em outro terminal)
 
@@ -227,6 +231,14 @@ flowchart LR
 4. Se o modo IA estiver ligado, os textos são enriquecidos pelo Claude (se falhar, segue sem IA).
 5. O resultado (JSON + Markdown) é salvo e o status vira `DONE`. O código enviado **é descartado**.
 6. O frontend acompanha o status (*polling*) e mostra o relatório assim que fica pronto.
+
+**Por que a API e o worker são processos separados?** O Node.js executa o JavaScript em uma única
+linha (o *event loop*). Ele atende muita gente ao mesmo tempo porque quase todo o trabalho de uma
+API é **esperar** (banco, Redis, rede). Já o motor de análise é **cálculo puro**: percorrer até
+1.500 arquivos com regex, contar linhas, montar a nota. Enquanto ele calcula, o processo não atende
+mais ninguém. Por isso a análise roda no container `worker` (mesma imagem, `APP_ROLE=worker`) e a
+API continua respondendo login, listagem e *polling* na hora, mesmo com análises grandes na fila.
+De quebra, o worker, que é quem abre código de desconhecidos, não recebe o `JWT_SECRET`.
 
 ## Como o explicador "lê" o código
 
@@ -336,7 +348,7 @@ Segurança foi tratada desde o primeiro commit. Resumo (detalhes em [`SECURITY.m
 - **SSRF**: a URL do GitHub nunca é acessada diretamente; o download é sempre de `codeload.github.com`, sem redirects.
 - **Segredos** encontrados no código analisado são **mascarados** no relatório e antes de ir para a IA.
 - **XSS**: o frontend nunca renderiza HTML vindo do relatório; CSP restrita no Nginx.
-- **Infra**: containers sem root, API com sistema de arquivos somente leitura, banco e Redis fora da rede pública.
+- **Infra**: containers sem root, API e worker com sistema de arquivos somente leitura, banco e Redis fora da rede pública, worker sem acesso ao `JWT_SECRET`.
 - **Supply chain**: `allowScripts` do npm 11 (só o Prisma roda script de instalação), telemetria bloqueada, Dependabot e `npm audit` no CI.
 - **Privacidade**: o código enviado **não é armazenado** — só o relatório.
 
@@ -406,7 +418,9 @@ A explicação de **cada commit** está em [`docs/COMMITS_EXPLICADOS.txt`](docs/
 │   │   ├── auth/ users/         cadastro, login, JWT e refresh tokens
 │   │   ├── security/            rate limiting
 │   │   ├── health/ config/ prisma/
-│   │   └── main.ts              bootstrap (Helmet, CORS, validação, Swagger)
+│   │   ├── app.module.ts        raiz da API (HTTP)
+│   │   ├── worker.module.ts     raiz do worker (fila de análises)
+│   │   └── main.ts              bootstrap: sobe a API e/ou o worker conforme o APP_ROLE
 │   ├── test/                    testes e2e
 │   └── Dockerfile
 ├── frontend/                    React + Vite
