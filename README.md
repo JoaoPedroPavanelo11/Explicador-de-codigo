@@ -58,7 +58,7 @@ Com a IA escrevendo código cada vez mais rápido, ficou fácil **gerar** códig
 |---|---|
 | **01 · A ideia** | O que o projeto faz, o tipo (API, SPA, CLI, mobile…), o domínio de negócio (bancário, e-commerce, saúde…), **para quem ele serve**, as funcionalidades e as rotas HTTP encontradas. |
 | **02 · Stack e estrutura** | Linguagens (com %), **tecnologias e versões**, o que cada uma faz e **o provável motivo da escolha**, a árvore de pastas e os padrões de arquitetura detectados (camadas, modular, Clean Architecture, MVC…). |
-| **03 · Pontos importantes** | Os trechos que carregam a regra de negócio (ex.: o *service* de usuários), com o código, **o que ele faz** e **o que há de interessante** nele. |
+| **03 · Pontos importantes** | Os **5 trechos que mais ensinam**, em ordem de importância: os que carregam a regra de negócio (ex.: o *service* de usuários), com o código, **o que ele faz** e **o que há de interessante** nele. |
 | **04 · Nota** | Nota de **0 a 10** baseada em 15 critérios objetivos, pontos fortes e uma lista de melhorias com **por quê** e **como**, em ordem de prioridade. |
 
 O relatório pode ser **baixado em Markdown** (`.md`). Veja um exemplo real gerado pela ferramenta:
@@ -85,7 +85,7 @@ gradientes, sombras ou "brilhos".
 > Pré-requisitos: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac) ou Docker Engine + Compose (Linux) e o [Git](https://git-scm.com/).
 
 ```bash
-git clone https://github.com/SEU-USUARIO/Explicador-de-codigo.git
+git clone https://github.com/JoaoPedroPavanelo11/Explicador-de-codigo.git
 cd Explicador-de-codigo
 ```
 
@@ -227,7 +227,7 @@ flowchart LR
 
 1. O usuário envia o código (colado, `.zip` ou URL do GitHub).
 2. A API valida tudo, cria o registro como `QUEUED` e responde **202 Accepted** na hora.
-3. O **worker** pega o job da fila, extrai os arquivos com segurança e roda o **motor de análise**.
+3. O **worker** pega o job da fila e faz a **triagem**: pelo índice do zip, sem descompactar, decide o que vale ler (veja [as 3 regras](#como-o-explicador-lê-o-código)). Depois extrai só esses arquivos, com segurança, e roda o **motor de análise**.
 4. Se o modo IA estiver ligado, os textos são enriquecidos pelo Claude (se falhar, segue sem IA).
 5. O resultado (JSON + Markdown) é salvo e o status vira `DONE`. O código enviado **é descartado**.
 6. O frontend acompanha o status (*polling*) e mostra o relatório assim que fica pronto.
@@ -431,7 +431,7 @@ A explicação de **cada commit** está em [`docs/COMMITS_EXPLICADOS.txt`](docs/
 │   ├── src/
 │   │   ├── analyzer/engine/     motor de análise (TypeScript puro)
 │   │   ├── analyses/            endpoints, fila (worker) e repositório das análises
-│   │   ├── ingestion/           leitura segura de .zip e download do GitHub
+│   │   ├── ingestion/           triagem, leitura segura de .zip e download do GitHub
 │   │   ├── ai/                  enriquecimento opcional com Claude
 │   │   ├── auth/ users/         cadastro, login, JWT e refresh tokens
 │   │   ├── security/            rate limiting
