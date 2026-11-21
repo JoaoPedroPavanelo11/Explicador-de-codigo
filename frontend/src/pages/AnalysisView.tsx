@@ -6,7 +6,7 @@ import { CodeBlock } from '../components/CodeBlock'
 import { Prose } from '../components/Prose'
 import { ScoreMeter } from '../components/ScoreMeter'
 import { Status } from '../components/Status'
-import { SOURCE_LABEL, formatDate, isPending } from '../lib/format'
+import { SOURCE_LABEL, coverageNotice, formatDate, isPending } from '../lib/format'
 import { NotFound } from './NotFound'
 
 const CHECK_MARK: Record<QualityCheck['status'], string> = {
@@ -117,6 +117,7 @@ function Section({ n, title, id, children }: { n: string; title: string; id: str
 
 function Report({ result }: { result: AnalysisResult }) {
   const { idea, stack, highlights, quality, meta, ai } = result
+  const notice = coverageNotice(meta)
   return (
     <div className="report">
       <aside className="report-index" aria-label="Seções do relatório">
@@ -135,6 +136,12 @@ function Report({ result }: { result: AnalysisResult }) {
       </aside>
 
       <div className="report-content">
+        {notice && (
+          <div className="coverage-notice" role="note">
+            <p className="label">{meta.leftOutFiles ? 'Visão panorâmica' : 'Aviso'}</p>
+            <Prose>{notice}</Prose>
+          </div>
+        )}
         <Section n="01" title="A ideia do código" id="ideia">
           <div className="lead-block">
             <Prose>{idea.summary}</Prose>

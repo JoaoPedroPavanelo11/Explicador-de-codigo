@@ -99,6 +99,7 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-10}
+      GITHUB_MAX_MB: ${GITHUB_MAX_MB:-50}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-claude-opus-5-5}
     depends_on:

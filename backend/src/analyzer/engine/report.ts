@@ -1,4 +1,22 @@
-import type { AnalysisResult, CheckStatus } from './types.js';
+import type { AnalysisMeta, AnalysisResult, CheckStatus } from './types.js';
+
+const fmt = (n: number) => n.toLocaleString('pt-BR');
+
+// Aviso para quem recebe o relatório quando nem tudo foi lido. null = leitura completa.
+export function coverageNotice(meta: AnalysisMeta): string | null {
+  const parts: string[] = [];
+  if (meta.leftOutFiles && meta.relevantFiles)
+    parts.push(
+      `Este projeto tem **${fmt(meta.relevantFiles)} arquivos** de código e configuração, mais do que conseguimos ler de uma vez. ` +
+        `Esta é uma **visão panorâmica**: lemos os **${fmt(meta.files)} mais importantes** (configuração, depois código do produto, depois testes). ` +
+        `A estrutura de pastas, a arquitetura e a contagem de testes consideram o projeto inteiro.`,
+    );
+  if (meta.oversizedFiles)
+    parts.push(
+      `${fmt(meta.oversizedFiles)} arquivo(s) com mais de 512 KB foram ignorados sem abrir; arquivos desse tamanho costumam ser gerados por ferramentas.`,
+    );
+  return parts.length ? parts.join(' ') : null;
+}
 
 const STATUS_ICON: Record<CheckStatus, string> = {
   ok: 'OK',
@@ -51,6 +69,11 @@ export function renderMarkdown(r: AnalysisResult, title: string): string {
         : ''),
   );
   out.push('');
+  const notice = coverageNotice(meta);
+  if (notice) {
+    out.push(`> **Aviso:** ${notice}`);
+    out.push('');
+  }
   out.push(`**Nota geral: ${quality.score.toFixed(1)}/10 — ${quality.level}**`);
   out.push('');
 

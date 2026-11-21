@@ -23,7 +23,8 @@ Respondo assim que possível e, depois da correção, dou o crédito (se você q
 | Ver dados de outra pessoa (IDOR) | Toda consulta filtra pelo dono na própria query (outra pessoa recebe 404) |
 | Entrada maliciosa | Validação com **Zod** em todos os endpoints; campos desconhecidos são recusados |
 | SSRF pela URL do GitHub | A URL do usuário nunca é acessada: extraímos dono/repo com regex e baixamos sempre de `codeload.github.com`, sem seguir redirects |
-| Zip bomb | Contamos os bytes reais ao descompactar e abortamos ao passar do limite |
+| Zip bomb | A triagem decide o que ler só pelo índice do zip, sem descompactar; ao ler, contamos os bytes reais e recusamos o zip se passarem do tamanho declarado ou do limite total |
+| Zip com milhares de entradas | Mais de 100 mil entradas no índice faz o zip ser recusado antes de qualquer leitura |
 | Zip slip / path traversal | Entradas com `../` ou caminho absoluto fazem o zip ser recusado; links simbólicos são ignorados; nada é escrito com o nome original |
 | Arquivo disfarçado | Conferimos a assinatura binária do `.zip` (não confiamos na extensão) |
 | Uploads gigantes | Limites de tamanho, quantidade de arquivos e de campos no multer e no JSON |

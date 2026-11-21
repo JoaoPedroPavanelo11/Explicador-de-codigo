@@ -33,8 +33,13 @@ export const envSchema = z.object({
   THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
 
   UPLOAD_MAX_MB: z.coerce.number().positive().max(50).default(10),
-  ANALYSIS_MAX_FILES: z.coerce.number().int().positive().default(1500),
-  ANALYSIS_MAX_TOTAL_MB: z.coerce.number().positive().default(25),
+  // zip do GitHub (compactado); vem com imagens e outros arquivos que a
+  // triagem descarta, por isso maior que o upload
+  GITHUB_MAX_MB: z.coerce.number().positive().max(200).default(50),
+  // regras de quantidade e de total descompactado (o teto por arquivo, 512 KB,
+  // fica em DEFAULT_LIMITS). Projeto maior vira visão panorâmica, não erro.
+  ANALYSIS_MAX_FILES: z.coerce.number().int().positive().default(5000),
+  ANALYSIS_MAX_TOTAL_MB: z.coerce.number().positive().max(200).default(40),
 
   // opcional
   ANTHROPIC_API_KEY: z.string().optional(),

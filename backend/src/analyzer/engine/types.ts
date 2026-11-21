@@ -123,6 +123,13 @@ export interface AnalysisMeta {
   engineVersion: string;
   aiEnhanced: boolean;
   skippedFiles: number;
+  // Opcionais: relatórios gerados antes da triagem (motor < 1.1) não têm.
+  // arquivos relevantes no projeto inteiro (lidos ou não)
+  relevantFiles?: number;
+  // relevantes que ficaram fora da leitura: > 0 = visão panorâmica
+  leftOutFiles?: number;
+  // acima de 512 KB, descartados sem abrir (geralmente gerados)
+  oversizedFiles?: number;
 }
 
 // só existe quando a IA rodou com sucesso

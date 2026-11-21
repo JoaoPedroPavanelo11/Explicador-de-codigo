@@ -235,7 +235,7 @@ flowchart LR
 **Por que a API e o worker são processos separados?** O Node.js executa o JavaScript em uma única
 linha (o *event loop*). Ele atende muita gente ao mesmo tempo porque quase todo o trabalho de uma
 API é **esperar** (banco, Redis, rede). Já o motor de análise é **cálculo puro**: percorrer até
-1.500 arquivos com regex, contar linhas, montar a nota. Enquanto ele calcula, o processo não atende
+5.000 arquivos com regex, contar linhas, montar a nota. Enquanto ele calcula, o processo não atende
 mais ninguém. Por isso a análise roda no container `worker` (mesma imagem, `APP_ROLE=worker`) e a
 API continua respondendo login, listagem e *polling* na hora, mesmo com análises grandes na fila.
 De quebra, o worker, que é quem abre código de desconhecidos, não recebe o `JWT_SECRET`.
@@ -245,8 +245,25 @@ De quebra, o worker, que é quem abre código de desconhecidos, não recebe o `J
 O coração do projeto é o **motor de análise** em [`backend/src/analyzer/engine`](backend/src/analyzer/engine):
 TypeScript puro, sem dependência de framework e **determinístico** (a mesma entrada gera o mesmo resultado).
 
+**Antes de ler: a triagem.** Num `.zip` ou repositório do GitHub, o explicador olha primeiro só o
+**índice** do zip (nome e tamanho de cada arquivo), sem descompactar nada, e aplica 3 regras:
+
+| Regra | Limite | Se passar |
+|---|---|---|
+| Tamanho por arquivo | 512 KB | Só aquele arquivo é ignorado (código escrito à mão quase nunca chega a isso; quem chega costuma ser gerado) |
+| Quantidade de arquivos | 5.000 | **Visão panorâmica**: lê os mais importantes e avisa no relatório |
+| Total descompactado | 40 MB | Idem |
+
+O que não ajuda a explicar nem a dar nota (`node_modules`, `dist`, `.git`, imagens, lockfiles,
+minificados…) é descartado **antes de contar**. Na visão panorâmica a ordem de importância é:
+arquivos de configuração (`package.json`, `Dockerfile`, README…), depois código do produto, depois
+testes, depois o resto. A árvore de pastas, a arquitetura e a contagem de testes usam o índice do
+projeto inteiro, então a nota não é prejudicada pelo que ficou de fora. Um `.zip` com mais de 100 mil
+entradas, ou que declara tamanhos falsos (*zip bomb*), é recusado.
+
 | Etapa | Arquivo | Como funciona |
 |---|---|---|
+| Triagem | `ingestion/triage.ts` | Decide o que ler pelo índice do zip: descarta o irrelevante, aplica as 3 regras e ordena por importância. |
 | Normalização | `normalize.ts` | Ignora `node_modules`, builds, binários e lockfiles; bloqueia `../`; aplica limites. |
 | Linguagens | `languages.ts` | Extensão → linguagem e contagem de linhas por linguagem. |
 | Manifestos | `manifests.ts` | Lê `package.json`, `requirements.txt`, `pyproject.toml`, `pom.xml`, Gradle, `go.mod`, `Cargo.toml`, `composer.json`, `Gemfile`, `.csproj`, `Dockerfile`, `docker-compose`, CI e `schema.prisma` para achar **tecnologias e versões**. |
@@ -255,7 +272,7 @@ TypeScript puro, sem dependência de framework e **determinístico** (a mesma en
 | Arquitetura | `architecture.ts` | Regras sobre pastas e arquivos detectam camadas, módulos, Clean Architecture, DDD, MVC, CQRS, monorepo… |
 | Ideia | `idea.ts` | Pontua 18 domínios de negócio por palavras-chave (pt/en) em caminhos, classes, rotas e README; classifica o tipo de projeto; extrai rotas de 10 frameworks. |
 | Funções | `code-units.ts` | Encontra funções/métodos em 15+ linguagens e mede tamanho, complexidade e aninhamento. |
-| Destaques | `highlights.ts` | Classifica o papel de cada arquivo (service, controller…), escolhe a função mais representativa e explica padrões como transação, *guard clauses*, injeção de dependência e uso de decimal para dinheiro. |
+| Destaques | `highlights.ts` | Escolhe os **5 trechos que mais ensinam**, em ordem de importância. Classifica o papel de cada arquivo (service, controller…) e só os melhores de cada papel têm as funções avaliadas uma a uma; escolhe a função mais representativa e explica padrões como transação, *guard clauses*, injeção de dependência e uso de decimal para dinheiro. |
 | Segredos | `secrets.ts` | Detecta chaves de API, tokens, senhas e strings de conexão — e mascara tudo no relatório. |
 | Nota | `quality.ts` | 15 critérios ponderados (ver abaixo). |
 | Relatório | `report.ts` | Gera o Markdown final com as 4 seções. |
@@ -330,6 +347,7 @@ curl -X POST http://localhost:3000/api/analyses/paste \
 | `PUBLIC_URL` | | Endereço do frontend, usado no CORS (padrão `http://localhost:8080`) |
 | `WEB_PORT` | | Porta exposta (padrão `8080`) |
 | `UPLOAD_MAX_MB` | | Tamanho máximo do `.zip` (padrão `10`) |
+| `GITHUB_MAX_MB` | | Tamanho máximo do repositório do GitHub, compactado (padrão `50`) |
 | `ANTHROPIC_API_KEY` | | Ativa o modo IA (opcional) |
 | `AI_MODEL` | | Modelo do Claude (padrão `claude-opus-5-5`) |
 
