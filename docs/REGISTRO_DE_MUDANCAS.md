@@ -13,6 +13,52 @@ que já foi feito, por quê, e o que precisa ser lembrado antes de mexer de novo
 
 ---
 
+## #004 — Cancelar/excluir uma análise no meio do processamento
+**Data:** 23/11/2026 · **Branch:** `fix/exclusao-durante-analise` · **Tipo:** correção + funcionalidade
+
+### O problema
+Se a análise era excluída enquanto o worker trabalhava:
+- `markProcessing` e `markDone` usavam `update`, que **lança erro** (P2025) quando a linha sumiu;
+- o catch tratava isso como "erro interno": registrava no log uma falha falsa, com stack trace, e o BullMQ agendava **uma nova tentativa** só para descobrir que não havia nada a fazer;
+- o worker continuava trabalhando para ninguém: download, análise e a **chamada paga da IA**;
+- o código ficava ~3 s a mais na pasta temporária, até a nova tentativa.
+
+> Correção da revisão inicial: eu tinha dito que o GitHub seria baixado de novo. **Não é verdade**: a nova tentativa já parava no início, porque a análise não existia mais.
+
+Descoberta de produto: a tela só oferecia **Excluir** em análises prontas. Não dava para cancelar uma análise na fila ou em andamento, nem excluir uma que falhou (ela ficava no painel para sempre).
+
+### A decisão
+- **Camada 1 (feita):** o worker aceita que a análise sumiu.
+  - `markProcessing` e `markDone` usam `updateMany` e devolvem `true` ou `false`;
+  - `false` vira o sinal interno `AnalysisDeleted`;
+  - o worker apaga o código, registra uma linha **informativa** e encerra **com sucesso**, sem nova tentativa.
+- **Camada 2 (feita):** pontos de checagem com `stillExists`, uma consulta pelo ID que leva menos de 1 ms. Eles ficam **depois do download** (que pode levar 30 s) e **antes da IA** (onde está o custo em dinheiro).
+- **Camada 3 (descartada por ora):** cancelamento ativo, avisando o worker via Redis e abortando o download com `AbortController`. Ganharia poucos segundos e exigiria um canal entre API e worker. **Reavaliar junto com o SSE**, que vai precisar desse mesmo canal.
+- **Descartada:** exclusão lógica (`deletedAt`). O resultado que o usuário pediu para apagar ficaria no banco, e isso vai contra o #003.
+
+### Interface, sem pesar na API
+- Análise na fila ou em andamento: botão **"Cancelar análise"**. Pronta ou com falha: **"Excluir"**. Ambos usam o mesmo `DELETE`.
+- O botão fica travado do clique até a resposta, então cliques extras não viram requisições (testado).
+- A consulta a cada 1,5 s **para** assim que a exclusão é confirmada.
+- Um 404 ("já não existia", por exemplo por outra aba) é tratado como sucesso, sem mensagem de erro.
+- O custo para a API é o mesmo de antes: um `DELETE` (apaga a linha; se o pedido ainda estiver na fila, tira da fila e apaga o arquivo, ver #003). O trabalho pesado de descartar fica com o worker.
+
+### Como foi provado
+- **Unitário do processor (novo, 5 cenários):** sem exclusão; excluída antes de começar; durante o download; durante a análise; durante a IA. Em todos, o worker termina sem erro, não chama `markFailed`, não registra erro e apaga o arquivo. A IA nunca é chamada depois da exclusão.
+- **Rodando o teste contra o código antigo,** 3 cenários falharam. O 4º ("durante a IA") passou, porque o banco falso não imita o P2025. Por isso:
+- **e2e com Postgres real:** depois do `DELETE`, `markProcessing`, `stillExists` e `markDone` devolvem `false`, sem lançar erro.
+- **Frontend (primeiro teste de página):**
+  - "Cancelar análise" manda **um único** `DELETE` mesmo com clique duplo e volta ao painel;
+  - uma análise com falha pode ser excluída;
+  - desistir na confirmação não manda nada.
+- **Resultados:** backend com 76 unitários e 9 e2e; frontend com 16 testes.
+
+### Atenção para o futuro
+- Ainda existe uma janela pequena: a exclusão chegar **depois** do último ponto de checagem e **durante** uma etapa longa, como uma IA lenta. O trabalho dessa etapa é perdido, mas sem erro e sem nova tentativa. Só a camada 3 eliminaria isso.
+- Se surgir uma etapa nova e cara no worker (outra chamada externa, por exemplo), ela precisa de um `assertStillExists` antes.
+
+---
+
 ## #003 — Código efêmero: o código não fica, a explicação fica
 **Data:** 23/11/2026 · **Branch:** `feat/codigo-efemero` · **Tipo:** segurança/privacidade + funcionalidade
 
