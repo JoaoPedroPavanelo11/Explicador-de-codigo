@@ -94,6 +94,8 @@ export interface NormalizeResult {
   files: SourceFile[];
   skipped: number;
   coverage?: Coverage;
+  // commit exato (SHA) quando o código veio do GitHub
+  commit?: string;
 }
 
 export function normalizeFiles(

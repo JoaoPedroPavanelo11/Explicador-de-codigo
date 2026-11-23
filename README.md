@@ -229,8 +229,22 @@ flowchart LR
 2. A API valida tudo, cria o registro como `QUEUED` e responde **202 Accepted** na hora.
 3. O **worker** pega o job da fila e faz a **triagem**: pelo índice do zip, sem descompactar, decide o que vale ler (veja [as 3 regras](#como-o-explicador-lê-o-código)). Depois extrai só esses arquivos, com segurança, e roda o **motor de análise**.
 4. Se o modo IA estiver ligado, os textos são enriquecidos pelo Claude (se falhar, segue sem IA).
-5. O resultado (JSON + Markdown) é salvo e o status vira `DONE`. O código enviado **é descartado**.
+5. O resultado (JSON + Markdown) é salvo e o status vira `DONE`. O código enviado **é apagado** (veja abaixo o que fica e o que some).
 6. O frontend acompanha o status (*polling*) e mostra o relatório assim que fica pronto.
+
+### O que fica guardado (e o que não fica)
+
+O código enviado existe **só enquanto é analisado**. Ele nunca viaja dentro do pedido na fila: a API grava o código numa pasta **em RAM** (volume `tmpfs`, compartilhado entre API e worker) e o pedido no Redis leva só o caminho do arquivo. Assim, nem o arquivo de persistência do Redis nem os pedidos que falharam guardam código.
+
+| | Guardado? |
+|---|---|
+| O código enviado (colado, `.zip` ou baixado do GitHub) | **Não.** Apagado ao fim da análise, também quando ela falha. Se o worker morrer no meio, uma faxina apaga o que tiver mais de 30 min |
+| A explicação com a nota (JSON + Markdown) | Sim, até o usuário excluir. Inclui até 5 trechos curtos do código, com segredos mascarados, porque eles fazem parte da explicação |
+| A identidade da fonte | Sim: link do GitHub **com o commit exato** analisado, nome do `.zip`, **impressão digital** (SHA-256) e um **minimapa** com o formato das linhas (recuo e comprimento, sem nenhum caractere do código) |
+
+A identidade é o que permite ao usuário reconhecer, meses depois, de qual código veio cada explicação. A impressão digital funciona como a de uma pessoa: o mesmo código sempre gera a mesma, mas não dá para reconstruir o código a partir dela.
+
+> **Atualizando de uma versão anterior?** Versões antigas levavam o código colado dentro da fila. Com a fila vazia, rode uma vez `docker compose exec worker node dist/scripts/purge-queue.js`: ele apaga os pedidos antigos e reescreve o arquivo de persistência do Redis, eliminando o código que tinha ficado nele. Antes do `up`, remova também o volume antigo de uploads: `docker volume rm explicador-de-codigo_uploads`.
 
 **Por que a API e o worker são processos separados?** O Node.js executa o JavaScript em uma única
 linha (o *event loop*). Ele atende muita gente ao mesmo tempo porque quase todo o trabalho de uma
@@ -275,7 +289,8 @@ entradas, ou que declara tamanhos falsos (*zip bomb*), é recusado.
 | Destaques | `highlights.ts` | Escolhe os **5 trechos que mais ensinam**, em ordem de importância. Classifica o papel de cada arquivo (service, controller…) e só os melhores de cada papel têm as funções avaliadas uma a uma; escolhe a função mais representativa e explica padrões como transação, *guard clauses*, injeção de dependência e uso de decimal para dinheiro. |
 | Segredos | `secrets.ts` | Detecta chaves de API, tokens, senhas e strings de conexão — e mascara tudo no relatório. |
 | Nota | `quality.ts` | 15 critérios ponderados (ver abaixo). |
-| Relatório | `report.ts` | Gera o Markdown final com as 4 seções. |
+| Identidade | `identity.ts` | Gera a impressão digital (SHA-256) e o minimapa do código, para reconhecer depois de onde veio a explicação sem guardar o código. |
+| Relatório | `report.ts` | Gera o Markdown final com as 4 seções e a fonte. |
 
 > Quer ensinar o explicador a reconhecer uma tecnologia nova? Adicione uma entrada em `catalog.ts`.
 
@@ -368,7 +383,7 @@ Segurança foi tratada desde o primeiro commit. Resumo (detalhes em [`SECURITY.m
 - **XSS**: o frontend nunca renderiza HTML vindo do relatório; CSP restrita no Nginx.
 - **Infra**: containers sem root, API e worker com sistema de arquivos somente leitura, banco e Redis fora da rede pública, worker sem acesso ao `JWT_SECRET`.
 - **Supply chain**: `allowScripts` do npm 11 (só o Prisma roda script de instalação), telemetria bloqueada, Dependabot e `npm audit` no CI.
-- **Privacidade**: o código enviado **não é armazenado** — só o relatório.
+- **Privacidade**: o código enviado **não é armazenado**. Fica numa pasta em RAM só durante a análise e a fila do Redis nunca o recebe. Ficam o relatório e a identidade da fonte: link/commit, impressão digital e minimapa ilegível ([detalhes](#o-que-fica-guardado-e-o-que-não-fica)).
 
 ## Testes e qualidade
 

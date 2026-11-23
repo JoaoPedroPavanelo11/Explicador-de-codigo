@@ -78,7 +78,7 @@ services:
         condition: service_completed_successfully
     read_only: true
     volumes:
-      - uploads:/app/tmp # a API grava o .zip aqui e o worker lê
+      - uploads-ram:/app/tmp # a API grava o código enviado aqui e o worker lê
     tmpfs:
       - /tmp
     security_opt:
@@ -116,7 +116,7 @@ services:
     stop_grace_period: 30s
     read_only: true
     volumes:
-      - uploads:/app/tmp
+      - uploads-ram:/app/tmp
     tmpfs:
       - /tmp
     security_opt:
@@ -140,7 +140,15 @@ services:
 volumes:
   pgdata:
   redisdata:
-  uploads: # .zip esperando o worker; apagado assim que a análise termina
+  # Código enviado esperando o worker. É tmpfs: fica na RAM, nunca no disco,
+  # e some num reinício. O worker apaga cada arquivo ao terminar a análise e
+  # uma faxina remove os esquecidos (mais de 30 min). uid 1000 = usuário node.
+  uploads-ram:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=256m,uid=1000,gid=1000,mode=0700"
 
 networks:
   backend:

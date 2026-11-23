@@ -13,6 +13,7 @@ function makeZip(
     symlink?: boolean;
     declaredSize?: number;
   }[],
+  comment = '', // o GitHub grava aqui o SHA do commit
 ): Buffer {
   const crcTable = Array.from({ length: 256 }, (_, n) => {
     let c = n;
@@ -64,7 +65,8 @@ function makeZip(
   end.writeUInt16LE(entries.length, 10);
   end.writeUInt32LE(centralBuf.length, 12);
   end.writeUInt32LE(offset, 16);
-  return Buffer.concat([...locals, centralBuf, end]);
+  end.writeUInt16LE(Buffer.byteLength(comment), 20);
+  return Buffer.concat([...locals, centralBuf, end, Buffer.from(comment)]);
 }
 
 const limits = {
@@ -84,6 +86,12 @@ describe('extractZip', () => {
     const { files, skipped } = await extractZip(zip, limits);
     expect(files.map((f) => f.path)).toEqual(['src/app.ts']);
     expect(skipped).toBe(1);
+  });
+
+  it('devolve o comentário do zip (o SHA do commit, no zip do GitHub)', async () => {
+    const sha = '7fd1a60b01f91b314f59955a4e4d4e80d8edf11d';
+    const zip = makeZip([{ name: 'r-main/a.ts', data: 'x' }], sha);
+    expect((await extractZip(zip, limits)).comment).toBe(sha);
   });
 
   it('descarta lixo e arquivo grande demais sem abrir, e segue com o resto', async () => {

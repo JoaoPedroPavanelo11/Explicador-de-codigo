@@ -36,7 +36,8 @@ Respondo assim que possível e, depois da correção, dou o crédito (se você q
 | Mapa da API exposto | Swagger só fica disponível fora de produção |
 | Dependências maliciosas | `allowScripts` do npm 11: só scripts de instalação aprovados rodam (Prisma); telemetria (`@scarf/scarf`) bloqueada; `npm audit` e Dependabot no CI |
 | Containers | Imagens multi-stage, usuário não-root e somente as portas necessárias |
-| Guardar código de terceiros | O código enviado **não é armazenado**: o `.zip` temporário é apagado após a análise; só o relatório fica salvo |
+| Guardar código de terceiros | O código enviado **não é armazenado**: fica numa pasta em RAM (`tmpfs`) só durante a análise e é apagado ao terminar, inclusive quando falha. Uma faxina apaga o que sobrar de um worker que morreu (mais de 30 min). Ficam o relatório (com até 5 trechos mascarados) e a identidade da fonte: link/commit, impressão digital SHA-256 e um minimapa sem nenhum caractere do código |
+| Código guardado pela fila | O pedido no Redis leva só o caminho do arquivo temporário, nunca o código. Por isso nem os pedidos que falharam nem o arquivo de persistência (AOF) do Redis guardam código. Para limpar o que versões antigas deixaram: `node dist/scripts/purge-queue.js` no worker |
 
 ## Boas práticas para quem for rodar em produção
 

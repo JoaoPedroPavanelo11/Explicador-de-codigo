@@ -5,6 +5,7 @@ import type { AnalysisDetail, AnalysisResult, QualityCheck } from '../api/types'
 import { CodeBlock } from '../components/CodeBlock'
 import { Prose } from '../components/Prose'
 import { ScoreMeter } from '../components/ScoreMeter'
+import { SourceCard } from '../components/SourceCard'
 import { Status } from '../components/Status'
 import { SOURCE_LABEL, coverageNotice, formatDate, isPending } from '../lib/format'
 import { NotFound } from './NotFound'
@@ -98,7 +99,7 @@ export function AnalysisView() {
         </div>
       )}
 
-      {data.status === 'DONE' && data.result && <Report result={data.result} />}
+      {data.status === 'DONE' && data.result && <Report result={data.result} source={<SourceCard {...data} />} />}
     </div>
   )
 }
@@ -115,7 +116,7 @@ function Section({ n, title, id, children }: { n: string; title: string; id: str
   )
 }
 
-function Report({ result }: { result: AnalysisResult }) {
+function Report({ result, source }: { result: AnalysisResult; source: React.ReactNode }) {
   const { idea, stack, highlights, quality, meta, ai } = result
   const notice = coverageNotice(meta)
   return (
@@ -136,6 +137,7 @@ function Report({ result }: { result: AnalysisResult }) {
       </aside>
 
       <div className="report-content">
+        {source}
         {notice && (
           <div className="coverage-notice" role="note">
             <p className="label">{meta.leftOutFiles ? 'Visão panorâmica' : 'Aviso'}</p>

@@ -11,6 +11,7 @@ const summaryFields = {
   title: true,
   sourceType: true,
   sourceRef: true,
+  sourceIdentity: true,
   status: true,
   score: true,
   aiEnhanced: true,
@@ -89,7 +90,14 @@ export class AnalysesRepository {
   findForProcessing(id: string) {
     return this.prisma.analysis.findUnique({
       where: { id },
-      select: { id: true, title: true, useAi: true, status: true },
+      select: {
+        id: true,
+        title: true,
+        useAi: true,
+        status: true,
+        sourceType: true,
+        sourceRef: true,
+      },
     });
   }
 
@@ -109,6 +117,7 @@ export class AnalysesRepository {
       aiEnhanced: boolean;
       result: Prisma.InputJsonValue;
       reportMd: string;
+      sourceIdentity: Prisma.InputJsonValue;
     },
   ) {
     return this.prisma.analysis.update({

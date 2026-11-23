@@ -20,6 +20,8 @@ export interface ZipResult {
   triage: Triage;
   // descartados sem abrir: irrelevantes, symlinks e grandes demais
   skipped: number;
+  // comentário do zip; no zip do GitHub é o SHA do commit
+  comment: string;
 }
 
 // PK\x03\x04, ou PK\x05\x06 em zip vazio
@@ -100,6 +102,7 @@ export async function extractZip(
       files,
       triage: plan,
       skipped: plan.ignored + plan.oversized + symlinks,
+      comment: zip.comment,
     };
   } catch (error) {
     throw toIngestError(error, limits);
