@@ -40,19 +40,22 @@ export class AnalysisProcessor extends WorkerHost {
 
   async process(job: Job<AnalysisJobData>): Promise<void> {
     const { analysisId } = job.data;
-    const analysis = await this.analyses.findForProcessing(analysisId);
-    if (!analysis) {
-      await this.cleanup(job.data); // análise excluída enquanto estava na fila
-      return;
-    }
-    await this.analyses.markProcessing(analysisId);
     const startedAt = Date.now();
 
     try {
+      const analysis = await this.analyses.findForProcessing(analysisId);
+      // excluída enquanto estava na fila, ou entre a busca e esta linha
+      if (!analysis || !(await this.analyses.markProcessing(analysisId)))
+        throw new AnalysisDeleted();
+
       const input = await this.ingest(job.data);
+      // o download pode levar até 30 s: não analisa o que já foi excluído
+      await this.assertStillExists(analysisId);
       const identity = buildSourceIdentity(input.files, input.commit);
       let result = analyzeProject(input.files, input.skipped, input.coverage);
       if (analysis.useAi && this.ai.isEnabled) {
+        // a chamada da IA é paga: nunca para uma análise que ninguém vai ver
+        await this.assertStillExists(analysisId);
         try {
           result = await this.ai.enhance(result);
         } catch (error) {
@@ -68,7 +71,7 @@ export class AnalysisProcessor extends WorkerHost {
         reportSource(analysis, identity.fingerprint, identity.commit),
       );
 
-      await this.analyses.markDone(analysisId, {
+      const saved = await this.analyses.markDone(analysisId, {
         score: result.quality.score,
         fileCount: result.meta.files,
         lineCount: result.meta.lines,
@@ -77,11 +80,20 @@ export class AnalysisProcessor extends WorkerHost {
         reportMd,
         sourceIdentity: identity as unknown as Prisma.InputJsonValue,
       });
+      if (!saved) throw new AnalysisDeleted(); // excluída durante a IA
       this.logger.log(
         `Análise ${analysisId} concluída em ${Date.now() - startedAt}ms (${result.meta.files} arquivos)`,
       );
       await this.cleanup(job.data);
     } catch (error) {
+      if (error instanceof AnalysisDeleted) {
+        // o usuário cancelou/excluiu: não é falha, não tenta de novo
+        this.logger.log(
+          `Análise ${analysisId} excluída pelo usuário durante o processamento; trabalho descartado`,
+        );
+        await this.cleanup(job.data);
+        return;
+      }
       const isLastAttempt = job.attemptsMade + 1 >= (job.opts.attempts ?? 1);
       if (error instanceof IngestError) {
         // erro de entrada (zip inválido, repo privado): retry não resolve
@@ -122,11 +134,19 @@ export class AnalysisProcessor extends WorkerHost {
     }
   }
 
+  private async assertStillExists(id: string) {
+    if (!(await this.analyses.stillExists(id))) throw new AnalysisDeleted();
+  }
+
   private async cleanup({ source }: AnalysisJobData) {
     const tmpPath = tmpPathOf(source);
     if (tmpPath) await unlink(tmpPath).catch(() => undefined);
   }
 }
+
+// Sinal interno: a análise foi excluída no meio do caminho. Não é erro, é o
+// usuário desistindo; o worker só descarta o trabalho e apaga o código.
+class AnalysisDeleted extends Error {}
 
 async function readTmp(path: string): Promise<Buffer> {
   try {
