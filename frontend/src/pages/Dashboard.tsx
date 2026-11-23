@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router'
 import { api } from '../api/client'
 import type { AnalysisSummary } from '../api/types'
+import { Minimap } from '../components/Minimap'
 import { Status } from '../components/Status'
 import { SOURCE_LABEL, formatDate, formatScore, isPending } from '../lib/format'
 
@@ -66,15 +67,24 @@ export function Dashboard() {
                   onKeyDown={(e) => e.key === 'Enter' && navigate(`/analises/${a.id}`)}
                 >
                   <td>
-                    <Link to={`/analises/${a.id}`} style={{ textDecoration: 'none' }}>
-                      {a.title}
-                    </Link>
-                    {a.fileCount !== null && (
-                      <div className="muted mono" style={{ fontSize: 12 }}>
-                        {a.fileCount} arquivos · {a.lineCount?.toLocaleString('pt-BR')} linhas
-                        {a.aiEnhanced ? ' · IA' : ''}
+                    <div className="project-cell">
+                      {a.sourceIdentity?.minimap[0] ? (
+                        <Minimap file={a.sourceIdentity.minimap[0]} thumbnail />
+                      ) : (
+                        <span className="minimap is-thumb" aria-hidden="true" />
+                      )}
+                      <div style={{ minWidth: 0 }}>
+                        <Link to={`/analises/${a.id}`} style={{ textDecoration: 'none' }}>
+                          {a.title}
+                        </Link>
+                        {a.fileCount !== null && (
+                          <div className="muted mono" style={{ fontSize: 12 }}>
+                            {a.fileCount} arquivos · {a.lineCount?.toLocaleString('pt-BR')} linhas
+                            {a.aiEnhanced ? ' · IA' : ''}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </td>
                   <td className="hide-sm muted">{SOURCE_LABEL[a.sourceType]}</td>
                   <td>

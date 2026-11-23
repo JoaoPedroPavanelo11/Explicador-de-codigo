@@ -10,11 +10,28 @@ export interface User {
 export type AnalysisStatus = 'QUEUED' | 'PROCESSING' | 'DONE' | 'FAILED'
 export type SourceType = 'PASTE' | 'ZIP' | 'GITHUB'
 
+// manter em sincronia com backend/src/analyzer/engine/identity.ts
+export interface MinimapFile {
+  path: string
+  totalLines: number
+  // 3 caracteres por linha: tipo (c código, # comentário, _ vazia), recuo e comprimento em base 36
+  lines: string
+}
+
+// O código não é guardado; isto é o que permite reconhecer de onde veio a explicação.
+export interface SourceIdentity {
+  fingerprint: string
+  commit?: string
+  minimap: MinimapFile[]
+}
+
 export interface AnalysisSummary {
   id: string
   title: string
   sourceType: SourceType
   sourceRef: string | null
+  // ausente em análises antigas e nas que não terminaram
+  sourceIdentity: SourceIdentity | null
   status: AnalysisStatus
   score: number | null
   aiEnhanced: boolean

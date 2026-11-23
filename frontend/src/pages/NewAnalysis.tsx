@@ -240,7 +240,13 @@ export function NewAnalysis() {
           </label>
         </div>
 
-        <div style={{ marginTop: 40 }}>
+        <p className="muted privacy-note">
+          Seu código é usado só para gerar a explicação e é apagado assim que a análise termina. Guardamos a explicação
+          com a nota e, para você reconhecer de onde ela veio, o link do GitHub ou uma impressão digital e o formato das
+          linhas (sem o código).
+        </p>
+
+        <div style={{ marginTop: 24 }}>
           <button className="btn btn-solid" type="submit" disabled={!canSubmit || submit.isPending}>
             {submit.isPending ? 'Enviando…' : 'Analisar código'}
           </button>
