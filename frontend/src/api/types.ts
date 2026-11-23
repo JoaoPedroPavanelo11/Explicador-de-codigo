@@ -105,6 +105,10 @@ export interface AnalysisResult {
     engineVersion: string
     aiEnhanced: boolean
     skippedFiles: number
+    // ausentes em relatórios gerados antes da triagem (motor < 1.1)
+    relevantFiles?: number
+    leftOutFiles?: number
+    oversizedFiles?: number
   }
 }
 

@@ -1,4 +1,4 @@
-import { ConsoleLogger, StandardSchemaValidationPipe } from '@nestjs/common';
+import { Logger, StandardSchemaValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -6,14 +6,38 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
-import type { Env } from './config/env.js';
+import { appRoleSchema, type Env } from './config/env.js';
+import { createLogger } from './config/logger.js';
+import { WorkerModule } from './worker.module.js';
 
-async function bootstrap() {
+// Um mesmo build, três jeitos de rodar (APP_ROLE):
+//   api    -> só HTTP (container "api" no docker compose)
+//   worker -> só a fila de análises (container "worker")
+//   all    -> os dois no mesmo processo; prático em dev, mas a análise volta a
+//             disputar o event loop com o HTTP
+async function main() {
+  const parsed = appRoleSchema.safeParse(process.env.APP_ROLE);
+  if (!parsed.success)
+    throw new Error('APP_ROLE inválido: use "api", "worker" ou "all"');
+  const role = parsed.data;
+
+  if (role === 'api' || role === 'all') await startApi();
+  if (role === 'worker' || role === 'all') await startWorker();
+}
+
+// sem HTTP: só o contexto de injeção de dependências com o processador da fila
+async function startWorker() {
+  const app = await NestFactory.createApplicationContext(WorkerModule, {
+    logger: createLogger('Worker'),
+  });
+  // no SIGTERM o bullmq termina o job atual antes de fechar
+  app.enableShutdownHooks();
+  new Logger('Worker').log('Worker de análises aguardando jobs');
+}
+
+async function startApi() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: new ConsoleLogger({
-      json: process.env.NODE_ENV === 'production',
-      redact: ['password', 'authorization', 'cookie', 'token', 'apiKey'],
-    }),
+    logger: createLogger('API'),
   });
 
   const config = app.get<ConfigService<Env, true>>(ConfigService);
@@ -68,4 +92,4 @@ async function bootstrap() {
   await app.listen(config.get('PORT', { infer: true }), '0.0.0.0');
 }
 
-await bootstrap();
+await main();

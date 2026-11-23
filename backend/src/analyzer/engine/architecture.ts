@@ -236,7 +236,10 @@ const RULES: Rule[] = [
   },
 ];
 
-export function detectArchitecture(files: SourceFile[]): ArchitecturePattern[] {
+// só usa os caminhos: recebe o índice completo, inclusive arquivos não lidos
+export function detectArchitecture(
+  files: Pick<SourceFile, 'path'>[],
+): ArchitecturePattern[] {
   const paths = files.map((f) => f.path);
   const dirs = new Set<string>();
   for (const p of paths) {
@@ -264,7 +267,10 @@ export function detectArchitecture(files: SourceFile[]): ArchitecturePattern[] {
 }
 
 // até 3 níveis, estilo `tree`
-export function buildTree(files: SourceFile[], maxLines = 45): string {
+export function buildTree(
+  files: Pick<SourceFile, 'path'>[],
+  maxLines = 45,
+): string {
   interface Node {
     children: Map<string, Node>;
     files: number;

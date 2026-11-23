@@ -38,7 +38,7 @@ export class AnalysisProcessor extends WorkerHost {
 
     try {
       const input = await this.ingest(job.data);
-      let result = analyzeProject(input.files, input.skipped);
+      let result = analyzeProject(input.files, input.skipped, input.coverage);
       if (analysis.useAi && this.ai.isEnabled) {
         try {
           result = await this.ai.enhance(result);

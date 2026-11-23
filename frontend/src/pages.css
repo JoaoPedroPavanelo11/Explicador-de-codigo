@@ -446,6 +446,18 @@
   margin-bottom: 12px;
 }
 
+/* aviso de leitura parcial (projeto grande) no topo do relatório */
+.coverage-notice {
+  margin-bottom: 40px;
+  padding: 20px 24px;
+  border: 1px solid var(--line-strong);
+  color: var(--fg-soft);
+}
+
+.coverage-notice .label {
+  margin-bottom: 8px;
+}
+
 .checks {
   display: grid;
   gap: 20px;
