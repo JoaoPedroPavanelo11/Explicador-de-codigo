@@ -54,7 +54,19 @@ function fence(code: string): string {
   return f;
 }
 
-export function renderMarkdown(r: AnalysisResult, title: string): string {
+// De onde veio o código. Ele mesmo não é guardado; isto é o que permite
+// reconhecê-lo depois (link da versão exata ou impressão digital).
+export interface ReportSource {
+  label: string;
+  url?: string;
+  fingerprint: string;
+}
+
+export function renderMarkdown(
+  r: AnalysisResult,
+  title: string,
+  source?: ReportSource,
+): string {
   const out: string[] = [];
   const { idea, stack, highlights, quality, meta } = r;
 
@@ -69,6 +81,15 @@ export function renderMarkdown(r: AnalysisResult, title: string): string {
         : ''),
   );
   out.push('');
+  if (source) {
+    const where = source.url
+      ? `[${source.label}](${source.url})`
+      : source.label;
+    out.push(
+      `> **Fonte:** ${where} · impressão digital \`sha256:${source.fingerprint.slice(0, 16)}\``,
+    );
+    out.push('');
+  }
   const notice = coverageNotice(meta);
   if (notice) {
     out.push(`> **Aviso:** ${notice}`);

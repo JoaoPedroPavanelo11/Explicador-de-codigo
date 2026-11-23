@@ -38,27 +38,33 @@ enum AnalysisStatus {
 }
 
 model Analysis {
-  id           String         @id @default(uuid()) @db.Uuid
-  userId       String         @map("user_id") @db.Uuid
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title        String         @db.VarChar(120)
-  sourceType   SourceType     @map("source_type")
-  // Ex.: URL do GitHub ou nome do .zip. O código-fonte em si NÃO é guardado.
-  sourceRef    String?        @map("source_ref") @db.VarChar(300)
-  status       AnalysisStatus @default(QUEUED)
-  useAi        Boolean        @default(false) @map("use_ai")
-  aiEnhanced   Boolean        @default(false) @map("ai_enhanced")
-  score        Decimal?       @db.Decimal(3, 1)
-  fileCount    Int?           @map("file_count")
-  lineCount    Int?           @map("line_count")
+  id             String         @id @default(uuid()) @db.Uuid
+  userId         String         @map("user_id") @db.Uuid
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String         @db.VarChar(120)
+  sourceType     SourceType     @map("source_type")
+  // O código enviado NÃO é guardado: existe só durante a análise e é apagado
+  // em seguida. Fica a explicação (result/reportMd, que inclui até 5 trechos
+  // curtos com segredos mascarados) e a identidade da fonte, abaixo.
+  // Ex.: URL do GitHub ou nome do .zip.
+  sourceRef      String?        @map("source_ref") @db.VarChar(300)
+  // Impressão digital (SHA-256), commit do GitHub e minimapa ilegível do
+  // código: o usuário reconhece de onde veio a explicação sem o código existir.
+  sourceIdentity Json?          @map("source_identity")
+  status         AnalysisStatus @default(QUEUED)
+  useAi          Boolean        @default(false) @map("use_ai")
+  aiEnhanced     Boolean        @default(false) @map("ai_enhanced")
+  score          Decimal?       @db.Decimal(3, 1)
+  fileCount      Int?           @map("file_count")
+  lineCount      Int?           @map("line_count")
   // Resultado estruturado (ideia, stack, destaques, nota) em JSON.
-  result       Json?
+  result         Json?
   // O relatório final em Markdown, pronto para download.
-  reportMd     String?        @map("report_md")
-  errorMessage String?        @map("error_message") @db.VarChar(500)
-  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz
-  finishedAt   DateTime?      @map("finished_at") @db.Timestamptz
+  reportMd       String?        @map("report_md")
+  errorMessage   String?        @map("error_message") @db.VarChar(500)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+  finishedAt     DateTime?      @map("finished_at") @db.Timestamptz
 
   // Listagem do usuário ordenada por data é a consulta mais comum.
   @@index([userId, createdAt(sort: Desc)])

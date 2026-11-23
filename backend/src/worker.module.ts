@@ -4,6 +4,7 @@ import { AiModule } from './ai/ai.module.js';
 import { ANALYSIS_QUEUE } from './analyses/analyses.constants.js';
 import { AnalysesRepository } from './analyses/analyses.repository.js';
 import { AnalysisProcessor } from './analyses/analysis.processor.js';
+import { TmpJanitor } from './analyses/tmp-janitor.js';
 import { ConfigRootModule, QueueRootModule } from './config/root-modules.js';
 import { IngestionModule } from './ingestion/ingestion.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
@@ -21,6 +22,6 @@ import { PrismaModule } from './prisma/prisma.module.js';
     IngestionModule,
     AiModule,
   ],
-  providers: [AnalysesRepository, AnalysisProcessor],
+  providers: [AnalysesRepository, AnalysisProcessor, TmpJanitor],
 })
 export class WorkerModule {}

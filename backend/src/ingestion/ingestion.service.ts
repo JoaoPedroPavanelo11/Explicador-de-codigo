@@ -16,6 +16,8 @@ const MB = 1024 * 1024;
 // Ler o índice é barato; isto só barra zips feitos para travar o servidor.
 const ZIP_MAX_ENTRIES = 100_000;
 
+const SHA1 = /^[0-9a-f]{40}$/;
+
 @Injectable()
 export class IngestionService {
   private readonly limits: IngestLimits;
@@ -35,21 +37,7 @@ export class IngestionService {
   }
 
   async fromZip(buffer: Buffer): Promise<NormalizeResult> {
-    const { files, triage, skipped } = await extractZip(buffer, {
-      ...this.limits,
-      maxEntries: ZIP_MAX_ENTRIES,
-    });
-    // a triagem já respeitou os limites; aqui só sai binário disfarçado
-    const result = normalizeFiles(files, this.limits);
-    return {
-      files: result.files,
-      skipped: result.skipped + skipped,
-      coverage: {
-        inventory: triage.inventory,
-        oversized: triage.oversized,
-        leftOut: triage.leftOut,
-      },
-    };
+    return (await this.readZip(buffer)).result;
   }
 
   async fromGithub(ref: GithubRepoRef): Promise<NormalizeResult> {
@@ -57,6 +45,29 @@ export class IngestionService {
       maxBytes: this.githubMaxBytes,
       timeoutMs: 30_000,
     });
-    return this.fromZip(zip);
+    const { result, comment } = await this.readZip(zip);
+    // o GitHub grava o SHA do commit no comentário do zip
+    return SHA1.test(comment) ? { ...result, commit: comment } : result;
+  }
+
+  private async readZip(buffer: Buffer) {
+    const { files, triage, skipped, comment } = await extractZip(buffer, {
+      ...this.limits,
+      maxEntries: ZIP_MAX_ENTRIES,
+    });
+    // a triagem já respeitou os limites; aqui só sai binário disfarçado
+    const result = normalizeFiles(files, this.limits);
+    return {
+      comment,
+      result: {
+        files: result.files,
+        skipped: result.skipped + skipped,
+        coverage: {
+          inventory: triage.inventory,
+          oversized: triage.oversized,
+          leftOut: triage.leftOut,
+        },
+      } satisfies NormalizeResult,
+    };
   }
 }
