@@ -16,6 +16,7 @@ import {
   ANALYSIS_QUEUE,
   UPLOAD_DIR,
 } from '../src/analyses/analyses.constants.js';
+import { AnalysesRepository } from '../src/analyses/analyses.repository.js';
 import { AppModule } from '../src/app.module.js';
 import { WorkerModule } from '../src/worker.module.js';
 
@@ -187,6 +188,39 @@ describe('Análises (e2e)', () => {
         .expect(204);
       expect(await queue.getJob(created.body.id)).toBeUndefined();
       expect(await tmpFiles()).toEqual(before);
+    } finally {
+      await queue.resume();
+    }
+  });
+
+  it('excluída no meio da análise: o worker é avisado sem erro (Postgres real)', async () => {
+    const repo = worker.get(AnalysesRepository);
+    await queue.pause();
+    try {
+      const created = await request(app.getHttpServer())
+        .post('/api/analyses/paste')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ files: [{ path: 'a.ts', content: 'export const x = 1;' }] })
+        .expect(202);
+      await request(app.getHttpServer())
+        .delete(`/api/analyses/${created.body.id}`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .expect(204);
+
+      // antes era update: lançava P2025 e o job ia para uma nova tentativa
+      await expect(repo.markProcessing(created.body.id)).resolves.toBe(false);
+      await expect(repo.stillExists(created.body.id)).resolves.toBe(false);
+      await expect(
+        repo.markDone(created.body.id, {
+          score: 5,
+          fileCount: 1,
+          lineCount: 1,
+          aiEnhanced: false,
+          result: {},
+          reportMd: '',
+          sourceIdentity: {},
+        }),
+      ).resolves.toBe(false);
     } finally {
       await queue.resume();
     }
