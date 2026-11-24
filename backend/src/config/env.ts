@@ -14,6 +14,7 @@ export const envSchema = z.object({
 
   // quantos proxies há na frente da API, para o req.ip (usado no rate limit)
   // ser o IP do visitante. docker compose: 1 (nginx). Railway: 2 (borda + nginx).
+  // Render: o site estático repassa o /api pela borda dela (ver render.yaml).
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1),
 
   // pode ter várias, separadas por vírgula
@@ -21,6 +22,12 @@ export const envSchema = z.object({
 
   DATABASE_URL: z.string().url(),
 
+  // endereço completo (redis://[usuario:senha@]host:porta). Quando existe,
+  // vale no lugar de REDIS_HOST/PORT/PASSWORD. A Render só entrega neste formato.
+  REDIS_URL: z
+    .string()
+    .regex(/^rediss?:\/\//, 'REDIS_URL precisa começar com redis:// ou rediss://')
+    .optional(),
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
   REDIS_PASSWORD: z.string().optional(),
