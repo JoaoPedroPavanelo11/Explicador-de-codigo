@@ -41,6 +41,16 @@ describe('validateEnv', () => {
     );
   });
 
+  it('aceita REDIS_URL opcional e recusa um endereço que não é de Redis', () => {
+    expect(validateEnv(base).REDIS_URL).toBe(undefined);
+    expect(
+      validateEnv({ ...base, REDIS_URL: 'redis://red-abc123:6379' }).REDIS_URL,
+    ).toBe('redis://red-abc123:6379');
+    expect(() =>
+      validateEnv({ ...base, REDIS_URL: 'http://red-abc123:6379' }),
+    ).toThrow(/REDIS_URL/);
+  });
+
   it('recusa quando DATABASE_URL está ausente', () => {
     expect(() => validateEnv({ JWT_SECRET: base.JWT_SECRET })).toThrow(
       /DATABASE_URL/,

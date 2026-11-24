@@ -13,6 +13,43 @@ que já foi feito, por quê, e o que precisa ser lembrado antes de mexer de novo
 
 ---
 
+## #005 — Deploy gratuito: Render + Neon
+**Data:** 24/11/2026 · **Branch:** `chore/render` · **Tipo:** infraestrutura
+
+### O problema
+O deploy na Railway foi preparado (commit `2e32c2c`), mas o período de teste da conta acabou. O plano Free dela dá US$ 1 por mês, pouco para 4 serviços ligados o tempo todo, e o plano pago (US$ 5 por mês) foi descartado.
+
+### A decisão
+- **Render (grátis):** o backend (API e worker juntos, `APP_ROLE=all`) roda num serviço Docker, o frontend num site estático e a fila no Key Value.
+- **Neon (grátis):** o Postgres. O banco grátis da Render **expira em 30 dias** e é apagado; o da Neon não expira.
+- Tudo na região **Ohio**, inclusive o Neon (AWS US East 2), para o banco ficar perto do backend.
+- O frontend **não usa o nginx** na Render. O site estático repassa `/api/*` para o backend com um *rewrite*. Assim o site e a API ficam na mesma origem: não é preciso CORS e o cookie de refresh (`sameSite: strict`) funciona como no compose. Os cabeçalhos de segurança do `nginx.conf.template` foram copiados para o `render.yaml`.
+- **Descartadas:**
+  - Koyeb: desde fevereiro de 2026 exige plano pago para contas novas.
+  - Northflank: o plano grátis tem só 1 banco, e precisamos de 2.
+  - Upstash: o limite de comandos não combina com o BullMQ, que consulta a fila o tempo todo.
+  - Oracle Free: exige cartão e dá trabalho de manter um servidor.
+  - Railway Free: o crédito é insuficiente.
+- **Railway mantida:** o estágio final do Dockerfile, que roda as migrations antes de subir, serve aos dois. A Render não deixa escolher o estágio, então ele **precisa continuar sendo o último**.
+
+### O que mudou
+- `render.yaml` (novo): Blueprint com o backend, o Key Value e o site estático. A Render só pergunta o `DATABASE_URL`, porque o `JWT_SECRET` é gerado por ela.
+- `REDIS_URL` (novo, opcional): a Render só entrega o Redis como endereço completo. Quando a variável existe, vale no lugar de `REDIS_HOST/PORT/PASSWORD`. Ver `createRedis` em `config/root-modules.ts`.
+
+### Como foi provado
+- Teste novo do `validateEnv`: `REDIS_URL` é opcional e um endereço que não é de Redis é recusado. Backend com 77 testes, typecheck, lint e build passando.
+- **Simulação local da Render:** imagem do Dockerfile com Postgres e Redis descartáveis, usando só `REDIS_URL` e `PORT=10000`. As migrations rodaram, o `/api/ready` respondeu ok, o cadastro funcionou e uma análise colada foi **concluída pelo worker** (pela fila, com o `REDIS_URL`).
+- O build do frontend passou e o `render.yaml` foi validado como YAML (3 serviços, 2 rewrites, 6 cabeçalhos).
+
+### Atenção para o futuro
+- **O backend dorme após 15 min sem acesso.** A primeira requisição depois disso leva cerca de 1 min, e o *rewrite* pode responder erro enquanto ele acorda.
+- **O Key Value grátis é só em memória.** Se reiniciar, a fila some, e uma análise que estava na fila fica parada como "na fila". As já concluídas estão no Postgres.
+- O `TRUST_PROXY=2` foi estimado (borda do site estático + borda da API) e **precisa ser conferido** depois do deploy. Se o valor estiver errado, o limite de tentativas de login passa a valer para todos juntos ou deixa de ser confiável.
+- Se o nome `explicador-api` já estiver em uso na Render, a URL ganha um sufixo, e o destino do rewrite no `render.yaml` precisa acompanhar.
+- O `DATABASE_URL` precisa ser a conexão **direta** do Neon (sem pooling), porque o `prisma migrate deploy` precisa dela.
+
+---
+
 ## #004 — Cancelar/excluir uma análise no meio do processamento
 **Data:** 23/11/2026 · **Branch:** `fix/exclusao-durante-analise` · **Tipo:** correção + funcionalidade
 
