@@ -28,3 +28,12 @@ EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=5 \
   CMD wget -qO- http://127.0.0.1:3000/api/ready > /dev/null || exit 1
 CMD ["node", "dist/main.js"]
+
+# Railway (último estágio = o que ele builda por padrão). Lá não existe o
+# serviço migrate do compose, então este roda as migrations antes de subir.
+# Precisa do prisma CLI (devDependency), por isso leva o node_modules completo.
+FROM runtime AS railway
+COPY --from=deps --chown=node:node /app/node_modules ./node_modules
+COPY --chown=node:node prisma.config.ts ./
+COPY --chown=node:node prisma ./prisma
+CMD ["sh", "-c", "npx prisma migrate deploy && exec node dist/main.js"]
