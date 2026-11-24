@@ -16,7 +16,8 @@ import './auth.types.js';
       inject: [ConfigService],
       useFactory: (config: ConfigService<Env, true>) => ({
         accessToken: {
-          key: config.get('JWT_SECRET', { infer: true }),
+          // validateEnv garante o segredo sempre que a API sobe
+          key: config.get('JWT_SECRET', { infer: true })!,
           ttl: config.get('JWT_TTL', { infer: true }),
           issuer: 'explicador-de-codigo',
         },

@@ -54,46 +54,78 @@ export function mask(value: string): string {
   return `${value.slice(0, 4)}${'*'.repeat(Math.min(12, value.length - 4))}`;
 }
 
+const MAX_LINE = 2000; // linha maior que isso é minificada: ignorada
+
+// início de cada linha, para achar o número da linha de um match
+function lineStartsOf(text: string): number[] {
+  const starts = [0];
+  for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1))
+    starts.push(i + 1);
+  return starts;
+}
+
+// índice (0-based) da linha que contém o offset
+function lineIndexAt(starts: number[], offset: number): number {
+  let lo = 0;
+  let hi = starts.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (starts[mid] <= offset) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
+}
+
+// Cada regex roda uma vez sobre o arquivo inteiro (e não linha a linha): em
+// projetos grandes isso é várias vezes mais rápido. O número da linha só é
+// calculado quando aparece um match, o que é raro.
 export function findSecrets(files: SourceFile[]): SecretFinding[] {
   const findings: SecretFinding[] = [];
   for (const file of files) {
     if (shouldSkip(file.path)) continue;
+    const text = file.content;
+    const found: SecretFinding[] = [];
+    let starts: number[] | null = null;
+
+    for (const { kind, re } of PATTERNS) {
+      re.lastIndex = 0;
+      for (const m of text.matchAll(re)) {
+        if (m[0].includes('\n')) continue; // segredo não atravessa linhas
+        const value = m[1] ?? m[0];
+        if (PLACEHOLDER.test(value)) continue;
+        starts ??= lineStartsOf(text);
+        const idx = lineIndexAt(starts, m.index);
+        const end = idx + 1 < starts.length ? starts[idx + 1] - 1 : text.length;
+        if (end - starts[idx] > MAX_LINE) continue;
+        found.push({ file: file.path, line: idx + 1, kind, preview: mask(value) });
+      }
+    }
+
+    // .env commitado: arquivo pequeno, linha a linha mesmo
     const isEnvFile =
       /(^|\/)\.env(\.[\w-]+)?$/.test(file.path) &&
       !file.path.includes('example');
-    const lines = file.content.split('\n');
-    lines.forEach((line, idx) => {
-      if (line.length > 2000) return; // linhas minificadas
-      for (const { kind, re } of PATTERNS) {
-        re.lastIndex = 0;
-        for (const m of line.matchAll(re)) {
-          const value = m[1] ?? m[0];
-          if (PLACEHOLDER.test(value)) continue;
-          findings.push({
-            file: file.path,
-            line: idx + 1,
-            kind,
-            preview: mask(value),
-          });
-        }
-      }
-      // .env commitado
-      if (
-        isEnvFile &&
-        /^\s*[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD|PASS)[A-Z0-9_]*\s*=\s*\S{6,}/.test(
-          line,
+    if (isEnvFile)
+      text.split('\n').forEach((line, idx) => {
+        if (
+          line.length > MAX_LINE ||
+          !/^\s*[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD|PASS)[A-Z0-9_]*\s*=\s*\S{6,}/.test(
+            line,
+          )
         )
-      ) {
+          return;
         const value = line.split('=').slice(1).join('=').trim();
         if (!PLACEHOLDER.test(value))
-          findings.push({
+          found.push({
             file: file.path,
             line: idx + 1,
             kind: 'Segredo em arquivo .env versionado',
             preview: mask(value),
           });
-      }
-    });
+      });
+
+    // em ordem de linha, como antes (sort estável mantém a ordem dos padrões)
+    findings.push(...found.sort((a, b) => a.line - b.line));
   }
   const seen = new Set<string>();
   return findings.filter((f) => {

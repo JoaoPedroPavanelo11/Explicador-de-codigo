@@ -396,32 +396,55 @@ function buildHighlight(
   };
 }
 
-export function selectHighlights(files: SourceFile[], max = 6): Highlight[] {
-  const candidates = files
-    .filter(
-      (f) =>
-        languageOf(f.path) &&
-        !SKIP.test(f.path) &&
-        !isAuxiliaryPath(f.path) &&
-        !/^(HTML|CSS|SCSS|Less|SQL|Jupyter Notebook)$/.test(
-          languageOf(f.path)!,
-        ),
+// quantos arquivos de cada papel têm as funções avaliadas uma a uma
+const CANDIDATES_PER_ROLE = 8;
+
+// Os 5 trechos que mais ensinam: regra de negócio (services, casos de uso,
+// domínio) vem antes de código de apoio, e funções com lógica de verdade antes
+// de getters. Saem em ordem de importância.
+// unitsByFile: funções já extraídas pelo motor, para não extrair de novo
+export function selectHighlights(
+  files: SourceFile[],
+  max = 5,
+  unitsByFile?: Map<string, CodeUnit[]>,
+): Highlight[] {
+  // etapa 1 (barata): pré-nota de cada arquivo pelo papel e pelo tamanho
+  const byRole = new Map<
+    string,
+    { f: SourceFile; role: Role; pre: number }[]
+  >();
+  for (const f of files) {
+    const language = languageOf(f.path);
+    if (
+      !language ||
+      SKIP.test(f.path) ||
+      isAuxiliaryPath(f.path) ||
+      /^(HTML|CSS|SCSS|Less|SQL|Jupyter Notebook)$/.test(language)
     )
-    .map((f) => {
-      const role = roleOf(f.path, f.content);
-      const units = extractUnits(f);
+      continue;
+    const lines = countLines(f.content);
+    if (lines < 5) continue;
+    const role = roleOf(f.path, f.content);
+    const list = byRole.get(role.id) ?? [];
+    list.push({ f, role, pre: role.weight * 2 + Math.log2(lines + 1) });
+    byRole.set(role.id, list);
+  }
+
+  // etapa 2 (cara): só os melhores de cada papel têm as funções avaliadas.
+  // Limitar por papel (e não no geral) mantém os trechos variados.
+  const candidates = [...byRole.values()]
+    .flatMap((list) =>
+      list.sort((a, b) => b.pre - a.pre).slice(0, CANDIDATES_PER_ROLE),
+    )
+    .map(({ f, role, pre }) => {
+      const units = unitsByFile?.get(f.path) ?? extractUnits(f);
       const best = units
         .map((u) => ({ u, s: scoreUnit(u) }))
         .sort((a, b) => b.s - a.s)[0];
-      const lines = countLines(f.content);
       // sem função reconhecida a explicação fica fraca
-      const score =
-        role.weight * 2 +
-        Math.log2(lines + 1) +
-        (best && best.s > 0 ? best.s : -8);
+      const score = pre + (best && best.s > 0 ? best.s : -8);
       return { f, role, unit: best?.u ?? null, score };
     })
-    .filter((c) => countLines(c.f.content) >= 5)
     .sort((a, b) => b.score - a.score);
 
   // evita relatório com 6 controllers iguais

@@ -58,7 +58,7 @@ Com a IA escrevendo código cada vez mais rápido, ficou fácil **gerar** códig
 |---|---|
 | **01 · A ideia** | O que o projeto faz, o tipo (API, SPA, CLI, mobile…), o domínio de negócio (bancário, e-commerce, saúde…), **para quem ele serve**, as funcionalidades e as rotas HTTP encontradas. |
 | **02 · Stack e estrutura** | Linguagens (com %), **tecnologias e versões**, o que cada uma faz e **o provável motivo da escolha**, a árvore de pastas e os padrões de arquitetura detectados (camadas, modular, Clean Architecture, MVC…). |
-| **03 · Pontos importantes** | Os trechos que carregam a regra de negócio (ex.: o *service* de usuários), com o código, **o que ele faz** e **o que há de interessante** nele. |
+| **03 · Pontos importantes** | Os **5 trechos que mais ensinam**, em ordem de importância: os que carregam a regra de negócio (ex.: o *service* de usuários), com o código, **o que ele faz** e **o que há de interessante** nele. |
 | **04 · Nota** | Nota de **0 a 10** baseada em 15 critérios objetivos, pontos fortes e uma lista de melhorias com **por quê** e **como**, em ordem de prioridade. |
 
 O relatório pode ser **baixado em Markdown** (`.md`). Veja um exemplo real gerado pela ferramenta:
@@ -85,7 +85,7 @@ gradientes, sombras ou "brilhos".
 > Pré-requisitos: [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac) ou Docker Engine + Compose (Linux) e o [Git](https://git-scm.com/).
 
 ```bash
-git clone https://github.com/SEU-USUARIO/Explicador-de-codigo.git
+git clone https://github.com/JoaoPedroPavanelo11/Explicador-de-codigo.git
 cd Explicador-de-codigo
 ```
 
@@ -111,7 +111,8 @@ O que o `docker compose` sobe:
 | Serviço | Para que serve | Porta exposta |
 |---|---|---|
 | `web` | Nginx servindo o React e repassando `/api` para a API | **8080** (a única) |
-| `api` | API NestJS + worker da fila de análises | — (rede interna) |
+| `api` | API NestJS: atende o site e enfileira as análises | — (rede interna) |
+| `worker` | Processa a fila: lê o código, roda o motor de análise e a IA | — (não recebe conexões) |
 | `migrate` | Aplica as migrations do banco e encerra | — |
 | `postgres` | Banco de dados (usuários e relatórios) | — (rede interna) |
 | `redis` | Fila de jobs (BullMQ) | — (rede interna) |
@@ -142,6 +143,9 @@ npm run start:dev
 
 A API sobe em `http://localhost:3000/api` e a documentação interativa (Swagger) em
 **`http://localhost:3000/api/docs`**.
+
+> Em desenvolvimento, `APP_ROLE=all` roda a API **e** o worker no mesmo processo, para você não
+> precisar de dois terminais. No Docker eles ficam em containers separados (veja [Arquitetura](#arquitetura)).
 
 **3. Rode o frontend** (em outro terminal)
 
@@ -223,18 +227,57 @@ flowchart LR
 
 1. O usuário envia o código (colado, `.zip` ou URL do GitHub).
 2. A API valida tudo, cria o registro como `QUEUED` e responde **202 Accepted** na hora.
-3. O **worker** pega o job da fila, extrai os arquivos com segurança e roda o **motor de análise**.
+3. O **worker** pega o job da fila e faz a **triagem**: pelo índice do zip, sem descompactar, decide o que vale ler (veja [as 3 regras](#como-o-explicador-lê-o-código)). Depois extrai só esses arquivos, com segurança, e roda o **motor de análise**.
 4. Se o modo IA estiver ligado, os textos são enriquecidos pelo Claude (se falhar, segue sem IA).
-5. O resultado (JSON + Markdown) é salvo e o status vira `DONE`. O código enviado **é descartado**.
+5. O resultado (JSON + Markdown) é salvo e o status vira `DONE`. O código enviado **é apagado** (veja abaixo o que fica e o que some).
 6. O frontend acompanha o status (*polling*) e mostra o relatório assim que fica pronto.
+
+### O que fica guardado (e o que não fica)
+
+O código enviado existe **só enquanto é analisado**. Ele nunca viaja dentro do pedido na fila: a API grava o código numa pasta **em RAM** (volume `tmpfs`, compartilhado entre API e worker) e o pedido no Redis leva só o caminho do arquivo. Assim, nem o arquivo de persistência do Redis nem os pedidos que falharam guardam código.
+
+| | Guardado? |
+|---|---|
+| O código enviado (colado, `.zip` ou baixado do GitHub) | **Não.** Apagado ao fim da análise, também quando ela falha. Se o worker morrer no meio, uma faxina apaga o que tiver mais de 30 min |
+| A explicação com a nota (JSON + Markdown) | Sim, até o usuário excluir. Inclui até 5 trechos curtos do código, com segredos mascarados, porque eles fazem parte da explicação |
+| A identidade da fonte | Sim: link do GitHub **com o commit exato** analisado, nome do `.zip`, **impressão digital** (SHA-256) e um **minimapa** com o formato das linhas (recuo e comprimento, sem nenhum caractere do código) |
+
+A identidade é o que permite ao usuário reconhecer, meses depois, de qual código veio cada explicação. A impressão digital funciona como a de uma pessoa: o mesmo código sempre gera a mesma, mas não dá para reconstruir o código a partir dela.
+
+> **Atualizando de uma versão anterior?** Versões antigas levavam o código colado dentro da fila. Com a fila vazia, rode uma vez `docker compose exec worker node dist/scripts/purge-queue.js`: ele apaga os pedidos antigos e reescreve o arquivo de persistência do Redis, eliminando o código que tinha ficado nele. Antes do `up`, remova também o volume antigo de uploads: `docker volume rm explicador-de-codigo_uploads`.
+
+**Por que a API e o worker são processos separados?** O Node.js executa o JavaScript em uma única
+linha (o *event loop*). Ele atende muita gente ao mesmo tempo porque quase todo o trabalho de uma
+API é **esperar** (banco, Redis, rede). Já o motor de análise é **cálculo puro**: percorrer até
+5.000 arquivos com regex, contar linhas, montar a nota. Enquanto ele calcula, o processo não atende
+mais ninguém. Por isso a análise roda no container `worker` (mesma imagem, `APP_ROLE=worker`) e a
+API continua respondendo login, listagem e *polling* na hora, mesmo com análises grandes na fila.
+De quebra, o worker, que é quem abre código de desconhecidos, não recebe o `JWT_SECRET`.
 
 ## Como o explicador "lê" o código
 
 O coração do projeto é o **motor de análise** em [`backend/src/analyzer/engine`](backend/src/analyzer/engine):
 TypeScript puro, sem dependência de framework e **determinístico** (a mesma entrada gera o mesmo resultado).
 
+**Antes de ler: a triagem.** Num `.zip` ou repositório do GitHub, o explicador olha primeiro só o
+**índice** do zip (nome e tamanho de cada arquivo), sem descompactar nada, e aplica 3 regras:
+
+| Regra | Limite | Se passar |
+|---|---|---|
+| Tamanho por arquivo | 512 KB | Só aquele arquivo é ignorado (código escrito à mão quase nunca chega a isso; quem chega costuma ser gerado) |
+| Quantidade de arquivos | 5.000 | **Visão panorâmica**: lê os mais importantes e avisa no relatório |
+| Total descompactado | 40 MB | Idem |
+
+O que não ajuda a explicar nem a dar nota (`node_modules`, `dist`, `.git`, imagens, lockfiles,
+minificados…) é descartado **antes de contar**. Na visão panorâmica a ordem de importância é:
+arquivos de configuração (`package.json`, `Dockerfile`, README…), depois código do produto, depois
+testes, depois o resto. A árvore de pastas, a arquitetura e a contagem de testes usam o índice do
+projeto inteiro, então a nota não é prejudicada pelo que ficou de fora. Um `.zip` com mais de 100 mil
+entradas, ou que declara tamanhos falsos (*zip bomb*), é recusado.
+
 | Etapa | Arquivo | Como funciona |
 |---|---|---|
+| Triagem | `ingestion/triage.ts` | Decide o que ler pelo índice do zip: descarta o irrelevante, aplica as 3 regras e ordena por importância. |
 | Normalização | `normalize.ts` | Ignora `node_modules`, builds, binários e lockfiles; bloqueia `../`; aplica limites. |
 | Linguagens | `languages.ts` | Extensão → linguagem e contagem de linhas por linguagem. |
 | Manifestos | `manifests.ts` | Lê `package.json`, `requirements.txt`, `pyproject.toml`, `pom.xml`, Gradle, `go.mod`, `Cargo.toml`, `composer.json`, `Gemfile`, `.csproj`, `Dockerfile`, `docker-compose`, CI e `schema.prisma` para achar **tecnologias e versões**. |
@@ -243,10 +286,11 @@ TypeScript puro, sem dependência de framework e **determinístico** (a mesma en
 | Arquitetura | `architecture.ts` | Regras sobre pastas e arquivos detectam camadas, módulos, Clean Architecture, DDD, MVC, CQRS, monorepo… |
 | Ideia | `idea.ts` | Pontua 18 domínios de negócio por palavras-chave (pt/en) em caminhos, classes, rotas e README; classifica o tipo de projeto; extrai rotas de 10 frameworks. |
 | Funções | `code-units.ts` | Encontra funções/métodos em 15+ linguagens e mede tamanho, complexidade e aninhamento. |
-| Destaques | `highlights.ts` | Classifica o papel de cada arquivo (service, controller…), escolhe a função mais representativa e explica padrões como transação, *guard clauses*, injeção de dependência e uso de decimal para dinheiro. |
+| Destaques | `highlights.ts` | Escolhe os **5 trechos que mais ensinam**, em ordem de importância. Classifica o papel de cada arquivo (service, controller…) e só os melhores de cada papel têm as funções avaliadas uma a uma; escolhe a função mais representativa e explica padrões como transação, *guard clauses*, injeção de dependência e uso de decimal para dinheiro. |
 | Segredos | `secrets.ts` | Detecta chaves de API, tokens, senhas e strings de conexão — e mascara tudo no relatório. |
 | Nota | `quality.ts` | 15 critérios ponderados (ver abaixo). |
-| Relatório | `report.ts` | Gera o Markdown final com as 4 seções. |
+| Identidade | `identity.ts` | Gera a impressão digital (SHA-256) e o minimapa do código, para reconhecer depois de onde veio a explicação sem guardar o código. |
+| Relatório | `report.ts` | Gera o Markdown final com as 4 seções e a fonte. |
 
 > Quer ensinar o explicador a reconhecer uma tecnologia nova? Adicione uma entrada em `catalog.ts`.
 
@@ -318,6 +362,7 @@ curl -X POST http://localhost:3000/api/analyses/paste \
 | `PUBLIC_URL` | | Endereço do frontend, usado no CORS (padrão `http://localhost:8080`) |
 | `WEB_PORT` | | Porta exposta (padrão `8080`) |
 | `UPLOAD_MAX_MB` | | Tamanho máximo do `.zip` (padrão `10`) |
+| `GITHUB_MAX_MB` | | Tamanho máximo do repositório do GitHub, compactado (padrão `50`) |
 | `ANTHROPIC_API_KEY` | | Ativa o modo IA (opcional) |
 | `AI_MODEL` | | Modelo do Claude (padrão `claude-opus-5-5`) |
 
@@ -336,9 +381,9 @@ Segurança foi tratada desde o primeiro commit. Resumo (detalhes em [`SECURITY.m
 - **SSRF**: a URL do GitHub nunca é acessada diretamente; o download é sempre de `codeload.github.com`, sem redirects.
 - **Segredos** encontrados no código analisado são **mascarados** no relatório e antes de ir para a IA.
 - **XSS**: o frontend nunca renderiza HTML vindo do relatório; CSP restrita no Nginx.
-- **Infra**: containers sem root, API com sistema de arquivos somente leitura, banco e Redis fora da rede pública.
+- **Infra**: containers sem root, API e worker com sistema de arquivos somente leitura, banco e Redis fora da rede pública, worker sem acesso ao `JWT_SECRET`.
 - **Supply chain**: `allowScripts` do npm 11 (só o Prisma roda script de instalação), telemetria bloqueada, Dependabot e `npm audit` no CI.
-- **Privacidade**: o código enviado **não é armazenado** — só o relatório.
+- **Privacidade**: o código enviado **não é armazenado**. Fica numa pasta em RAM só durante a análise e a fila do Redis nunca o recebe. Ficam o relatório e a identidade da fonte: link/commit, impressão digital e minimapa ilegível ([detalhes](#o-que-fica-guardado-e-o-que-não-fica)).
 
 ## Testes e qualidade
 
@@ -401,12 +446,14 @@ A explicação de **cada commit** está em [`docs/COMMITS_EXPLICADOS.txt`](docs/
 │   ├── src/
 │   │   ├── analyzer/engine/     motor de análise (TypeScript puro)
 │   │   ├── analyses/            endpoints, fila (worker) e repositório das análises
-│   │   ├── ingestion/           leitura segura de .zip e download do GitHub
+│   │   ├── ingestion/           triagem, leitura segura de .zip e download do GitHub
 │   │   ├── ai/                  enriquecimento opcional com Claude
 │   │   ├── auth/ users/         cadastro, login, JWT e refresh tokens
 │   │   ├── security/            rate limiting
 │   │   ├── health/ config/ prisma/
-│   │   └── main.ts              bootstrap (Helmet, CORS, validação, Swagger)
+│   │   ├── app.module.ts        raiz da API (HTTP)
+│   │   ├── worker.module.ts     raiz do worker (fila de análises)
+│   │   └── main.ts              bootstrap: sobe a API e/ou o worker conforme o APP_ROLE
 │   ├── test/                    testes e2e
 │   └── Dockerfile
 ├── frontend/                    React + Vite
@@ -416,7 +463,7 @@ A explicação de **cada commit** está em [`docs/COMMITS_EXPLICADOS.txt`](docs/
 │   │   ├── components/          CodeBlock, ScoreMeter, Prose…
 │   │   ├── pages/               telas
 │   │   └── index.css            design system
-│   ├── nginx.conf
+│   ├── nginx.conf.template
 │   └── Dockerfile
 ├── docs/                        documentação, imagens e exemplo de relatório
 ├── docker-compose.yml           projeto completo

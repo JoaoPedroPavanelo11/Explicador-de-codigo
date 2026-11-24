@@ -5,12 +5,10 @@ import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import type { Env } from '../config/env.js';
 import { AiModule } from '../ai/ai.module.js';
-import { IngestionModule } from '../ingestion/ingestion.module.js';
 import { ANALYSIS_QUEUE } from './analyses.constants.js';
 import { AnalysesController } from './analyses.controller.js';
 import { AnalysesRepository } from './analyses.repository.js';
 import { AnalysesService } from './analyses.service.js';
-import { AnalysisProcessor } from './analysis.processor.js';
 import { MetaController } from './meta.controller.js';
 
 @Module({
@@ -29,10 +27,10 @@ import { MetaController } from './meta.controller.js';
         },
       }),
     }),
-    IngestionModule,
     AiModule,
   ],
   controllers: [AnalysesController, MetaController],
-  providers: [AnalysesService, AnalysesRepository, AnalysisProcessor],
+  // o AnalysisProcessor não fica aqui: ele roda no WorkerModule (outro processo)
+  providers: [AnalysesService, AnalysesRepository],
 })
 export class AnalysesModule {}

@@ -122,10 +122,13 @@ export function isReadableFile(path: string): boolean {
   return ext in CODE_LANGUAGES || TEXT_EXTENSIONS.has(ext);
 }
 
+// indexOf é nativo e salta direto até o próximo \n: bem mais rápido que olhar
+// caractere por caractere, e é chamado para todos os arquivos várias vezes
 export function countLines(content: string): number {
   if (content.length === 0) return 0;
   let n = 1;
-  for (let i = 0; i < content.length; i++) if (content[i] === '\n') n++;
+  for (let i = content.indexOf('\n'); i !== -1; i = content.indexOf('\n', i + 1))
+    n++;
   return n;
 }
 
@@ -153,6 +156,13 @@ export function languageStats(files: SourceFile[]): LanguageStat[] {
 // testes, fixtures, mocks, migrations, gerados... não contam como código do produto
 export function isAuxiliaryPath(path: string): boolean {
   return /(^|\/)(__tests__|__fixtures__|__mocks__|tests?|spec|fixtures?|mocks?|examples?|samples?|docs?|migrations?|generated|e2e|cypress|storybook|\.storybook)\/|\.(spec|test|stories|d)\.[a-z]+$|_test\.(go|py)$|(^|\/)test_\w+\.py$|Tests?\.(java|cs|kt)$/i.test(
+    path,
+  );
+}
+
+// arquivo de teste automatizado (subconjunto do auxiliar)
+export function isTestPath(path: string): boolean {
+  return /(\.(spec|test)\.[a-z]+$|(^|\/)(test|tests|__tests__|spec)\/|_test\.(go|py)$|(^|\/)test_[\w]+\.py$|Tests?\.(java|cs|kt)$)/i.test(
     path,
   );
 }

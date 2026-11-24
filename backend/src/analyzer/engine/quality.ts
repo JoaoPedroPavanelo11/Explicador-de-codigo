@@ -3,6 +3,7 @@ import {
   basename,
   countLines,
   isAuxiliaryPath,
+  isTestPath,
   languageOf,
 } from './languages.js';
 import type { SecretFinding } from './secrets.js';
@@ -23,12 +24,11 @@ export interface QualityInput {
   isApi: boolean;
   // trecho solto: testes, readme, ci etc. não entram na conta
   isSnippet: boolean;
+  // Caminho de TODOS os arquivos relevantes, inclusive os que ficaram fora da
+  // leitura em projetos grandes. Checagens que só dependem do nome (tem testes?
+  // tem CI?) usam esta lista, para a visão panorâmica não distorcer a nota.
+  paths?: string[];
 }
-
-const isTestFile = (p: string) =>
-  /(\.(spec|test)\.[a-z]+$|(^|\/)(test|tests|__tests__|spec)\/|_test\.(go|py)$|(^|\/)test_[\w]+\.py$|Tests?\.(java|cs|kt)$)/i.test(
-    p,
-  );
 
 const isCodeFile = (p: string) => {
   const l = languageOf(p);
@@ -41,20 +41,21 @@ const isCodeFile = (p: string) => {
 // critério com ratio null não se aplica e sai do denominador
 export function assessQuality(input: QualityInput): QualitySection {
   const { files, units, techs, secrets, isApi, isSnippet } = input;
+  const paths = input.paths ?? files.map((f) => f.path);
   const checks: QualityCheck[] = [];
   const improvements: Improvement[] = [];
   const strengths: string[] = [];
   const has = (...names: string[]) => techs.some((t) => names.includes(t.name));
-  const hasFile = (re: RegExp) => files.some((f) => re.test(f.path));
-  const sourceFiles = files.filter(
-    (f) =>
-      isCodeFile(f.path) && !isTestFile(f.path) && !isAuxiliaryPath(f.path),
-  );
-  const testFiles = files.filter(
-    (f) => isCodeFile(f.path) && isTestFile(f.path),
-  );
+  const hasFile = (re: RegExp) => paths.some((p) => re.test(p));
+  const isProductCode = (p: string) =>
+    isCodeFile(p) && !isTestPath(p) && !isAuxiliaryPath(p);
+  // conteúdo: só dos arquivos lidos
+  const sourceFiles = files.filter((f) => isProductCode(f.path));
+  // contagem por nome: do projeto inteiro
+  const sourceCount = paths.filter(isProductCode).length;
+  const testCount = paths.filter((p) => isCodeFile(p) && isTestPath(p)).length;
   const prodUnits = units.filter(
-    (u) => !isTestFile(u.file) && !isAuxiliaryPath(u.file),
+    (u) => !isTestPath(u.file) && !isAuxiliaryPath(u.file),
   );
 
   const check = (
@@ -114,11 +115,9 @@ export function assessQuality(input: QualityInput): QualitySection {
       'Não se aplica a um trecho isolado.',
     );
   else {
-    const ratio = sourceFiles.length
-      ? testFiles.length / sourceFiles.length
-      : 0;
+    const ratio = sourceCount ? testCount / sourceCount : 0;
     const score =
-      testFiles.length === 0
+      testCount === 0
         ? 0
         : ratio >= 0.25
           ? 1
@@ -130,9 +129,9 @@ export function assessQuality(input: QualityInput): QualitySection {
       'Testes automatizados',
       15,
       score,
-      `${testFiles.length} arquivo(s) de teste para ${sourceFiles.length} arquivo(s) de código.`,
+      `${testCount} arquivo(s) de teste para ${sourceCount} arquivo(s) de código.`,
     );
-    if (testFiles.length === 0)
+    if (testCount === 0)
       improvements.push({
         title: 'Escreva os primeiros testes automatizados',
         why: 'Sem testes, cada mudança pode quebrar algo sem ninguém perceber — e com código gerado por IA isso fica ainda mais importante: o teste é o que prova que o código faz o que deveria.',
@@ -142,13 +141,13 @@ export function assessQuality(input: QualityInput): QualitySection {
     else if (score < 1)
       improvements.push({
         title: 'Aumente a cobertura de testes',
-        why: `Há testes, mas poucos em relação ao tamanho do código (${testFiles.length} para ${sourceFiles.length} arquivos).`,
+        why: `Há testes, mas poucos em relação ao tamanho do código (${testCount} para ${sourceCount} arquivos).`,
         how: 'Priorize testar regras de negócio e casos de erro (entradas inválidas, recurso não encontrado). Ative o relatório de cobertura para ver o que falta.',
         priority: 'média',
       });
     else
       strengths.push(
-        `Boa presença de testes automatizados (${testFiles.length} arquivos de teste).`,
+        `Boa presença de testes automatizados (${testCount} arquivos de teste).`,
       );
   }
 

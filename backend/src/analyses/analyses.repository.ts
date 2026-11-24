@@ -11,6 +11,7 @@ const summaryFields = {
   title: true,
   sourceType: true,
   sourceRef: true,
+  sourceIdentity: true,
   status: true,
   score: true,
   aiEnhanced: true,
@@ -89,18 +90,34 @@ export class AnalysesRepository {
   findForProcessing(id: string) {
     return this.prisma.analysis.findUnique({
       where: { id },
-      select: { id: true, title: true, useAi: true, status: true },
+      select: {
+        id: true,
+        title: true,
+        useAi: true,
+        status: true,
+        sourceType: true,
+        sourceRef: true,
+      },
     });
   }
 
-  markProcessing(id: string) {
-    return this.prisma.analysis.update({
+  // O usuário pode excluir a análise enquanto o worker trabalha. Por isso os
+  // métodos usados pelo worker usam updateMany (que não lança erro se a linha
+  // sumiu) e devolvem se a análise ainda existia.
+
+  async stillExists(id: string): Promise<boolean> {
+    return (await this.prisma.analysis.count({ where: { id } })) === 1;
+  }
+
+  async markProcessing(id: string): Promise<boolean> {
+    const { count } = await this.prisma.analysis.updateMany({
       where: { id },
       data: { status: AnalysisStatus.PROCESSING },
     });
+    return count === 1;
   }
 
-  markDone(
+  async markDone(
     id: string,
     data: {
       score: number;
@@ -109,9 +126,10 @@ export class AnalysesRepository {
       aiEnhanced: boolean;
       result: Prisma.InputJsonValue;
       reportMd: string;
+      sourceIdentity: Prisma.InputJsonValue;
     },
-  ) {
-    return this.prisma.analysis.update({
+  ): Promise<boolean> {
+    const { count } = await this.prisma.analysis.updateMany({
       where: { id },
       data: {
         ...data,
@@ -120,6 +138,7 @@ export class AnalysesRepository {
         errorMessage: null,
       },
     });
+    return count === 1;
   }
 
   markFailed(id: string, errorMessage: string) {

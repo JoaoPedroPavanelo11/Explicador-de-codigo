@@ -11,13 +11,16 @@ import {
 } from '@nestjs/common';
 import type { Queue } from 'bullmq';
 import { IngestError } from '../analyzer/engine/normalize.js';
-import { SourceType } from '../generated/prisma/client.js';
+import type { SourceIdentity } from '../analyzer/engine/identity.js';
+import { SourceType, type Prisma } from '../generated/prisma/client.js';
 import { parseGithubUrl } from '../ingestion/github-fetcher.js';
 import { isZip } from '../ingestion/zip-extractor.js';
 import { AnalysesRepository } from './analyses.repository.js';
 import {
   ANALYSIS_QUEUE,
   MAX_PENDING_PER_USER,
+  tmpPathOf,
+  UPLOAD_DIR,
   type AnalysisJobData,
   type AnalysisSource,
 } from './analyses.constants.js';
@@ -27,7 +30,19 @@ import type {
   UploadFields,
 } from './analyses.schemas.js';
 
-export const UPLOAD_DIR = join(process.cwd(), 'tmp', 'uploads');
+// no painel basta a miniatura do arquivo principal, não o minimapa inteiro
+function thumbnailOf(value: Prisma.JsonValue): SourceIdentity | null {
+  const identity = value as SourceIdentity | null;
+  if (!identity) return null;
+  return { ...identity, minimap: identity.minimap.slice(0, 1) };
+}
+
+interface NewAnalysis {
+  title: string;
+  useAi: boolean;
+  sourceType: SourceType;
+  sourceRef?: string;
+}
 
 @Injectable()
 export class AnalysesService {
@@ -43,13 +58,15 @@ export class AnalysesService {
       (input.files.length === 1
         ? first!
         : `Código colado (${input.files.length} arquivos)`);
-    return this.enqueue(
+    await this.assertCanEnqueue(userId);
+    const tmpPath = await this.stash(
+      Buffer.from(JSON.stringify(input.files)),
+      'json',
+    );
+    return this.enqueueWithTmp(
       userId,
       { title, useAi: input.useAi, sourceType: SourceType.PASTE },
-      {
-        kind: 'paste',
-        files: input.files,
-      },
+      { kind: 'paste', tmpPath },
     );
   }
 
@@ -90,28 +107,20 @@ export class AnalysesService {
       throw new BadRequestException('O arquivo precisa ser um .zip válido');
 
     await this.assertCanEnqueue(userId);
-    await mkdir(UPLOAD_DIR, { recursive: true, mode: 0o700 });
-    const tmpPath = join(UPLOAD_DIR, `${randomUUID()}.zip`);
-    await writeFile(tmpPath, file.buffer, { mode: 0o600 });
+    const tmpPath = await this.stash(file.buffer, 'zip');
     const safeName = file.originalname
       .replace(/[^\w.\- ]+/g, '_')
       .slice(0, 120);
-    try {
-      return await this.enqueue(
-        userId,
-        {
-          title: fields.title ?? safeName,
-          useAi: fields.useAi,
-          sourceType: SourceType.ZIP,
-          sourceRef: safeName,
-        },
-        { kind: 'zip', tmpPath },
-        true,
-      );
-    } catch (error) {
-      await unlink(tmpPath).catch(() => undefined);
-      throw error;
-    }
+    return this.enqueueWithTmp(
+      userId,
+      {
+        title: fields.title ?? safeName,
+        useAi: fields.useAi,
+        sourceType: SourceType.ZIP,
+        sourceRef: safeName,
+      },
+      { kind: 'zip', tmpPath },
+    );
   }
 
   list(userId: string, limit: number, cursor?: string) {
@@ -119,6 +128,7 @@ export class AnalysesService {
       ...page,
       items: page.items.map((i) => ({
         ...i,
+        sourceIdentity: thumbnailOf(i.sourceIdentity),
         score: i.score === null ? null : Number(i.score),
       })),
     }));
@@ -144,6 +154,45 @@ export class AnalysesService {
   async remove(userId: string, id: string) {
     if (!(await this.analyses.deleteOwned(userId, id)))
       throw new NotFoundException('Análise não encontrada');
+    await this.discardQueued(id);
+  }
+
+  // Excluída ainda na fila: tira o pedido e apaga o código na hora, sem esperar
+  // o worker. Se já estiver sendo analisada, o worker descarta ao terminar.
+  private async discardQueued(id: string) {
+    try {
+      const job = await this.queue.getJob(id);
+      if (!job) return;
+      const state = await job.getState();
+      if (!['waiting', 'delayed', 'prioritized'].includes(state)) return;
+      await job.remove();
+      const tmpPath = tmpPathOf(job.data.source);
+      if (tmpPath) await unlink(tmpPath).catch(() => undefined);
+    } catch {
+      // corrida com o worker pegando o pedido: ele mesmo limpa
+    }
+  }
+
+  // grava o código enviado na pasta temporária; na fila vai só o caminho
+  private async stash(content: Buffer, ext: 'zip' | 'json') {
+    await mkdir(UPLOAD_DIR, { recursive: true, mode: 0o700 });
+    const tmpPath = join(UPLOAD_DIR, `${randomUUID()}.${ext}`);
+    await writeFile(tmpPath, content, { mode: 0o600 });
+    return tmpPath;
+  }
+
+  // se não der para enfileirar, o arquivo não pode ficar para trás
+  private async enqueueWithTmp(
+    userId: string,
+    data: NewAnalysis,
+    source: AnalysisSource & { tmpPath: string },
+  ) {
+    try {
+      return await this.enqueue(userId, data, source, true);
+    } catch (error) {
+      await unlink(source.tmpPath).catch(() => undefined);
+      throw error;
+    }
   }
 
   private async assertCanEnqueue(userId: string) {
@@ -156,12 +205,7 @@ export class AnalysesService {
 
   private async enqueue(
     userId: string,
-    data: {
-      title: string;
-      useAi: boolean;
-      sourceType: SourceType;
-      sourceRef?: string;
-    },
+    data: NewAnalysis,
     source: AnalysisSource,
     alreadyChecked = false,
   ) {
@@ -174,6 +218,8 @@ export class AnalysesService {
         jobId: analysis.id,
         attempts: 2,
         backoff: { type: 'exponential', delay: 3000 },
+        // o pedido só leva ids e o caminho do arquivo temporário, nunca código,
+        // então guardar os que falharam (para investigar) não expõe nada
         removeOnComplete: true,
         removeOnFail: 100,
       },

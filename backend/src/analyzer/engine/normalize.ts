@@ -7,10 +7,14 @@ export interface IngestLimits {
   maxTotalBytes: number;
 }
 
+// As 3 regras. Por arquivo: código escrito à mão quase nunca passa de 200 KB;
+// acima de 512 KB é quase sempre gerado (bundle, dump), que não ensina nada.
+// Total: 40 MB de texto cabem ~5.000 arquivos de tamanho típico (~8 KB) e mantêm
+// a memória de um job abaixo de ~250 MB.
 export const DEFAULT_LIMITS: IngestLimits = {
-  maxFiles: 1500,
+  maxFiles: 5000,
   maxFileBytes: 512 * 1024,
-  maxTotalBytes: 25 * 1024 * 1024,
+  maxTotalBytes: 40 * 1024 * 1024,
 };
 
 const IGNORED_DIRS = new Set([
@@ -49,6 +53,11 @@ const IGNORED_DIRS = new Set([
 const IGNORED_FILES =
   /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|poetry\.lock|Cargo\.lock|composer\.lock|Gemfile\.lock|go\.sum|.*\.min\.(js|css)|.*\.map)$/i;
 
+// lockfiles, minificados e source maps: texto, mas gerado por ferramenta
+export function isIgnoredFile(path: string): boolean {
+  return IGNORED_FILES.test(path);
+}
+
 export class IngestError extends Error {}
 
 // null = ignorar. Bloqueia "../", caminho absoluto e byte nulo.
@@ -71,9 +80,22 @@ export function looksBinary(buf: Buffer): boolean {
   return sample.includes(0);
 }
 
+// O que a triagem do .zip descobriu sobre o projeto inteiro, além do que foi lido
+export interface Coverage {
+  // caminho de todos os arquivos relevantes, lidos ou não
+  inventory: string[];
+  // relevantes, mas acima do teto por arquivo: descartados sem abrir
+  oversized: number;
+  // relevantes que ficaram fora do orçamento (visão panorâmica)
+  leftOut: number;
+}
+
 export interface NormalizeResult {
   files: SourceFile[];
   skipped: number;
+  coverage?: Coverage;
+  // commit exato (SHA) quando o código veio do GitHub
+  commit?: string;
 }
 
 export function normalizeFiles(
@@ -89,7 +111,7 @@ export function normalizeFiles(
     if (
       !path ||
       seen.has(path) ||
-      IGNORED_FILES.test(path) ||
+      isIgnoredFile(path) ||
       !isReadableFile(path)
     ) {
       skipped++;

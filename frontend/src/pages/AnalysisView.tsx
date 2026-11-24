@@ -1,12 +1,13 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router'
 import { ApiError, api } from '../api/client'
 import type { AnalysisDetail, AnalysisResult, QualityCheck } from '../api/types'
 import { CodeBlock } from '../components/CodeBlock'
 import { Prose } from '../components/Prose'
 import { ScoreMeter } from '../components/ScoreMeter'
+import { SourceCard } from '../components/SourceCard'
 import { Status } from '../components/Status'
-import { SOURCE_LABEL, formatDate, isPending } from '../lib/format'
+import { SOURCE_LABEL, coverageNotice, formatDate, isPending } from '../lib/format'
 import { NotFound } from './NotFound'
 
 const CHECK_MARK: Record<QualityCheck['status'], string> = {
@@ -19,10 +20,33 @@ const CHECK_MARK: Record<QualityCheck['status'], string> = {
 export function AnalysisView() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  // Excluir (pronta/falhou) e cancelar (na fila/em andamento) usam o mesmo DELETE.
+  // A API remove o pedido da fila na hora; se o worker já estiver analisando,
+  // ele percebe e descarta o trabalho sozinho.
+  const remove = useMutation({
+    mutationFn: async () => {
+      try {
+        await api(`/analyses/${id}`, { method: 'DELETE' })
+      } catch (err) {
+        // já não existia (outra aba, clique duplo): o resultado é o mesmo
+        if (!(err instanceof ApiError && err.status === 404)) throw err
+      }
+    },
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: ['analysis', id] })
+      void queryClient.invalidateQueries({ queryKey: ['analyses'] })
+      navigate('/painel')
+    },
+  })
+
   const { data, error, isLoading } = useQuery({
     queryKey: ['analysis', id],
     queryFn: () => api<AnalysisDetail>(`/analyses/${id}`),
-    refetchInterval: (q) => (q.state.data && isPending(q.state.data.status) ? 1500 : false),
+    // para de consultar assim que o usuário confirma a exclusão
+    refetchInterval: (q) =>
+      !remove.isPending && !remove.isSuccess && q.state.data && isPending(q.state.data.status) ? 1500 : false,
     retry: (count, err) => !(err instanceof ApiError && (err.status === 404 || err.status === 400)) && count < 2,
   })
 
@@ -39,11 +63,6 @@ export function AnalysisView() {
     },
   })
 
-  const remove = useMutation({
-    mutationFn: () => api(`/analyses/${id}`, { method: 'DELETE' }),
-    onSuccess: () => navigate('/painel'),
-  })
-
   if (error instanceof ApiError && (error.status === 404 || error.status === 400)) return <NotFound />
   if (isLoading || !data)
     return (
@@ -51,6 +70,8 @@ export function AnalysisView() {
         <div className="spinner-line" />
       </div>
     )
+
+  const pending = isPending(data.status)
 
   return (
     <div className="page">
@@ -64,21 +85,34 @@ export function AnalysisView() {
           </h1>
           <Status status={data.status} />
         </div>
-        {data.status === 'DONE' && (
-          <div className="head-actions">
+        <div className="head-actions">
+          {data.status === 'DONE' && (
             <button type="button" className="btn btn-solid" onClick={() => download.mutate()} disabled={download.isPending}>
               Baixar .md
             </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => confirm('Excluir esta análise?') && remove.mutate()}
-            >
-              Excluir
-            </button>
-          </div>
-        )}
+          )}
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={remove.isPending || remove.isSuccess}
+            onClick={() =>
+              confirm(
+                pending
+                  ? 'Cancelar esta análise? O código enviado será apagado e nada será salvo.'
+                  : 'Excluir esta análise?',
+              ) && remove.mutate()
+            }
+          >
+            {remove.isPending ? (pending ? 'Cancelando…' : 'Excluindo…') : pending ? 'Cancelar análise' : 'Excluir'}
+          </button>
+        </div>
       </div>
+
+      {remove.error && (
+        <p className="form-error" role="alert">
+          {(remove.error as Error).message}
+        </p>
+      )}
 
       {isPending(data.status) && (
         <div className="empty">
@@ -98,7 +132,7 @@ export function AnalysisView() {
         </div>
       )}
 
-      {data.status === 'DONE' && data.result && <Report result={data.result} />}
+      {data.status === 'DONE' && data.result && <Report result={data.result} source={<SourceCard {...data} />} />}
     </div>
   )
 }
@@ -115,8 +149,9 @@ function Section({ n, title, id, children }: { n: string; title: string; id: str
   )
 }
 
-function Report({ result }: { result: AnalysisResult }) {
+function Report({ result, source }: { result: AnalysisResult; source: React.ReactNode }) {
   const { idea, stack, highlights, quality, meta, ai } = result
+  const notice = coverageNotice(meta)
   return (
     <div className="report">
       <aside className="report-index" aria-label="Seções do relatório">
@@ -135,6 +170,13 @@ function Report({ result }: { result: AnalysisResult }) {
       </aside>
 
       <div className="report-content">
+        {source}
+        {notice && (
+          <div className="coverage-notice" role="note">
+            <p className="label">{meta.leftOutFiles ? 'Visão panorâmica' : 'Aviso'}</p>
+            <Prose>{notice}</Prose>
+          </div>
+        )}
         <Section n="01" title="A ideia do código" id="ideia">
           <div className="lead-block">
             <Prose>{idea.summary}</Prose>

@@ -1,16 +1,27 @@
 import yauzl from 'yauzl';
-import { IngestError, normalizePath } from '../analyzer/engine/normalize.js';
+import {
+  IngestError,
+  type IngestLimits,
+} from '../analyzer/engine/normalize.js';
+import { triage, type Triage } from './triage.js';
 
-export interface ZipLimits {
+export interface ZipLimits extends IngestLimits {
+  // teto de entradas no índice (inclui lixo); só barra zips absurdos
   maxEntries: number;
-  // descompactado, somando tudo
-  maxTotalBytes: number;
-  maxFileBytes: number;
 }
 
 export interface RawFile {
   path: string;
   content: Buffer;
+}
+
+export interface ZipResult {
+  files: RawFile[];
+  triage: Triage;
+  // descartados sem abrir: irrelevantes, symlinks e grandes demais
+  skipped: number;
+  // comentário do zip; no zip do GitHub é o SHA do commit
+  comment: string;
 }
 
 // PK\x03\x04, ou PK\x05\x06 em zip vazio
@@ -24,13 +35,17 @@ export function isZip(buf: Buffer): boolean {
   );
 }
 
-// Extrai em memória. O tamanho declarado no cabeçalho não é confiável (zip bomb),
-// então os bytes são contados durante a descompactação. Symlinks são ignorados.
+const MB = 1024 * 1024;
+
+// Extrai em memória, em duas fases:
+//   1. lê só o índice do zip (nomes e tamanhos) e faz a triagem
+//   2. descompacta apenas os arquivos escolhidos, um por vez
+// O tamanho declarado no índice pode mentir (zip bomb), então na fase 2 os
+// bytes reais também são contados e o zip é recusado se passar do declarado.
 export async function extractZip(
   buffer: Buffer,
   limits: ZipLimits,
-  shouldRead: (path: string) => boolean,
-): Promise<{ files: RawFile[]; skipped: number }> {
+): Promise<ZipResult> {
   if (!isZip(buffer))
     throw new IngestError('O arquivo enviado não é um .zip válido.');
 
@@ -38,6 +53,7 @@ export async function extractZip(
   try {
     zip = await yauzl.fromBufferPromise(buffer, {
       lazyEntries: true,
+      autoClose: false, // a fase 2 ainda precisa do zip aberto
       validateEntrySizes: true, // erro se o tamanho real divergir do declarado
       strictFileNames: false,
     });
@@ -47,83 +63,104 @@ export async function extractZip(
     );
   }
 
-  if (zip.entryCount > limits.maxEntries) {
-    zip.close();
-    throw new IngestError(
-      `O .zip tem ${zip.entryCount} entradas; o limite é ${limits.maxEntries}.`,
-    );
-  }
+  try {
+    if (zip.entryCount > limits.maxEntries)
+      throw new IngestError(
+        `O .zip tem ${zip.entryCount.toLocaleString('pt-BR')} entradas; o limite é ${limits.maxEntries.toLocaleString('pt-BR')}.`,
+      );
 
-  const files: RawFile[] = [];
-  let total = 0;
-  let skipped = 0;
-
-  return new Promise((resolve, reject) => {
-    const fail = (err: Error) => {
-      zip.close();
-      if (err instanceof IngestError) return reject(err);
-      // o yauzl já recusa "../" e caminho absoluto (zip slip)
-      if (/relative path|absolute path|invalid characters/i.test(err.message))
-        return reject(
-          new IngestError(
-            'O .zip contém caminhos inválidos (como "../") e foi recusado por segurança.',
-          ),
-        );
-      reject(new IngestError('Falha ao ler o .zip.'));
-    };
-
-    zip.on('error', fail);
-    zip.on('end', () => resolve({ files, skipped }));
-    zip.on('entry', (entry: yauzl.Entry) => {
-      const isDir = entry.fileName.endsWith('/');
+    // fase 1: índice
+    const entries = await listEntries(zip);
+    let symlinks = 0;
+    const candidates = entries.filter((e) => {
+      if (e.fileName.endsWith('/')) return false; // pasta
       // modo unix nos 16 bits altos; 0o120000 = symlink
-      const mode = (entry.externalFileAttributes >>> 16) & 0o170000;
-      const path = normalizePath(entry.fileName);
-      if (
-        isDir ||
-        mode === 0o120000 ||
-        !path ||
-        !shouldRead(path) ||
-        entry.uncompressedSize > limits.maxFileBytes
-      ) {
-        if (!isDir) skipped++;
-        zip.readEntry();
-        return;
+      if (((e.externalFileAttributes >>> 16) & 0o170000) === 0o120000) {
+        symlinks++;
+        return false;
       }
-      zip.openReadStream(entry, (err, stream) => {
-        if (err) return fail(err);
-        const chunks: Buffer[] = [];
-        let size = 0;
-        stream.on('data', (chunk: Buffer) => {
-          size += chunk.length;
-          total += chunk.length;
-          if (size > limits.maxFileBytes || total > limits.maxTotalBytes) {
-            stream.destroy();
-            fail(
-              new IngestError(
-                `O conteúdo descompactado passa do limite de ${Math.round(limits.maxTotalBytes / 1024 / 1024)} MB.`,
-              ),
-            );
-            return;
-          }
-          chunks.push(chunk);
-        });
-        stream.on('error', fail);
-        stream.on('end', () => {
-          files.push({ path, content: Buffer.concat(chunks) });
-          zip.readEntry();
-        });
-      });
+      return true;
+    });
+    const plan = triage(
+      candidates.map((e) => ({ name: e.fileName, size: e.uncompressedSize })),
+      limits,
+    );
+
+    // fase 2: só o que a triagem escolheu
+    const files: RawFile[] = [];
+    let total = 0;
+    for (const entry of candidates) {
+      const path = plan.toRead.get(entry.fileName);
+      if (!path) continue;
+      const content = await readEntry(zip, entry, limits.maxFileBytes);
+      total += content.length;
+      if (total > limits.maxTotalBytes) throw zipBomb(limits);
+      files.push({ path, content });
+    }
+
+    return {
+      files,
+      triage: plan,
+      skipped: plan.ignored + plan.oversized + symlinks,
+      comment: zip.comment,
+    };
+  } catch (error) {
+    throw toIngestError(error, limits);
+  } finally {
+    zip.close();
+  }
+}
+
+function listEntries(zip: yauzl.ZipFile): Promise<yauzl.Entry[]> {
+  return new Promise((resolve, reject) => {
+    const entries: yauzl.Entry[] = [];
+    zip.on('error', reject);
+    zip.on('end', () => resolve(entries));
+    zip.on('entry', (entry: yauzl.Entry) => {
+      entries.push(entry);
+      zip.readEntry();
     });
     zip.readEntry();
   });
 }
 
-// repo-main/src/x.ts -> src/x.ts
-export function stripCommonRoot(files: RawFile[]): RawFile[] {
-  if (files.length === 0) return files;
-  const first = files[0].path.split('/')[0];
-  const allShare = files.every((f) => f.path.startsWith(`${first}/`));
-  if (!allShare) return files;
-  return files.map((f) => ({ ...f, path: f.path.slice(first.length + 1) }));
+async function readEntry(
+  zip: yauzl.ZipFile,
+  entry: yauzl.Entry,
+  maxBytes: number,
+): Promise<Buffer> {
+  const stream = await zip.openReadStreamPromise(entry);
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of stream as AsyncIterable<Buffer>) {
+    size += chunk.length;
+    if (size > maxBytes) {
+      stream.destroy();
+      throw new ZipBombSignal();
+    }
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+class ZipBombSignal extends Error {}
+
+function zipBomb(limits: IngestLimits): IngestError {
+  return new IngestError(
+    `O .zip declara tamanhos menores do que o conteúdo real (possível "zip bomb") ou passa de ${Math.round(limits.maxTotalBytes / MB)} MB descompactado, e foi recusado por segurança.`,
+  );
+}
+
+function toIngestError(error: unknown, limits: IngestLimits): IngestError {
+  if (error instanceof IngestError) return error;
+  if (error instanceof ZipBombSignal) return zipBomb(limits);
+  const message = error instanceof Error ? error.message : '';
+  // o yauzl já recusa "../" e caminho absoluto (zip slip)
+  if (/relative path|absolute path|invalid characters/i.test(message))
+    return new IngestError(
+      'O .zip contém caminhos inválidos (como "../") e foi recusado por segurança.',
+    );
+  // validateEntrySizes: tamanho real diferente do declarado
+  if (/too many bytes|too few bytes/i.test(message)) return zipBomb(limits);
+  return new IngestError('Falha ao ler o .zip.');
 }

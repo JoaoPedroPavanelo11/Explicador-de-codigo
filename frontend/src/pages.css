@@ -446,6 +446,104 @@
   margin-bottom: 12px;
 }
 
+/* aviso de leitura parcial (projeto grande) no topo do relatório */
+.coverage-notice {
+  margin-bottom: 40px;
+  padding: 20px 24px;
+  border: 1px solid var(--line-strong);
+  color: var(--fg-soft);
+}
+
+.coverage-notice .label {
+  margin-bottom: 8px;
+}
+
+/* de onde veio a explicação: o código foi apagado, fica a identidade dele */
+.source-card {
+  margin-bottom: 40px;
+  padding: 20px 24px;
+  border: 1px solid var(--line);
+}
+
+.source-card .label {
+  margin-bottom: 12px;
+}
+
+.source-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 40px;
+  margin: 0;
+}
+
+.source-facts dt {
+  font-size: 12px;
+}
+
+.source-facts dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.source-minimaps {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.source-minimaps figure {
+  margin: 0;
+  min-width: 0;
+}
+
+.source-minimaps figcaption {
+  font-size: 11px;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+.source-note {
+  font-size: 13px;
+  margin: 16px 0 0;
+}
+
+.minimap {
+  display: block;
+  width: 100%;
+  max-height: 220px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+}
+
+.minimap .mm-code {
+  fill: var(--fg-soft);
+  opacity: 0.55;
+}
+
+.minimap .mm-comment {
+  fill: var(--muted);
+  opacity: 0.45;
+}
+
+.minimap.is-thumb {
+  flex: none;
+  width: 36px;
+  height: 44px;
+}
+
+.project-cell {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.privacy-note {
+  font-size: 13px;
+  margin-top: 32px;
+  max-width: 640px;
+}
+
 .checks {
   display: grid;
   gap: 20px;

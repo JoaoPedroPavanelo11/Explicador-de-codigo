@@ -23,7 +23,8 @@ Respondo assim que possível e, depois da correção, dou o crédito (se você q
 | Ver dados de outra pessoa (IDOR) | Toda consulta filtra pelo dono na própria query (outra pessoa recebe 404) |
 | Entrada maliciosa | Validação com **Zod** em todos os endpoints; campos desconhecidos são recusados |
 | SSRF pela URL do GitHub | A URL do usuário nunca é acessada: extraímos dono/repo com regex e baixamos sempre de `codeload.github.com`, sem seguir redirects |
-| Zip bomb | Contamos os bytes reais ao descompactar e abortamos ao passar do limite |
+| Zip bomb | A triagem decide o que ler só pelo índice do zip, sem descompactar; ao ler, contamos os bytes reais e recusamos o zip se passarem do tamanho declarado ou do limite total |
+| Zip com milhares de entradas | Mais de 100 mil entradas no índice faz o zip ser recusado antes de qualquer leitura |
 | Zip slip / path traversal | Entradas com `../` ou caminho absoluto fazem o zip ser recusado; links simbólicos são ignorados; nada é escrito com o nome original |
 | Arquivo disfarçado | Conferimos a assinatura binária do `.zip` (não confiamos na extensão) |
 | Uploads gigantes | Limites de tamanho, quantidade de arquivos e de campos no multer e no JSON |
@@ -35,7 +36,8 @@ Respondo assim que possível e, depois da correção, dou o crédito (se você q
 | Mapa da API exposto | Swagger só fica disponível fora de produção |
 | Dependências maliciosas | `allowScripts` do npm 11: só scripts de instalação aprovados rodam (Prisma); telemetria (`@scarf/scarf`) bloqueada; `npm audit` e Dependabot no CI |
 | Containers | Imagens multi-stage, usuário não-root e somente as portas necessárias |
-| Guardar código de terceiros | O código enviado **não é armazenado**: o `.zip` temporário é apagado após a análise; só o relatório fica salvo |
+| Guardar código de terceiros | O código enviado **não é armazenado**: fica numa pasta em RAM (`tmpfs`) só durante a análise e é apagado ao terminar, inclusive quando falha. Uma faxina apaga o que sobrar de um worker que morreu (mais de 30 min). Ficam o relatório (com até 5 trechos mascarados) e a identidade da fonte: link/commit, impressão digital SHA-256 e um minimapa sem nenhum caractere do código |
+| Código guardado pela fila | O pedido no Redis leva só o caminho do arquivo temporário, nunca o código. Por isso nem os pedidos que falharam nem o arquivo de persistência (AOF) do Redis guardam código. Para limpar o que versões antigas deixaram: `node dist/scripts/purge-queue.js` no worker |
 
 ## Boas práticas para quem for rodar em produção
 

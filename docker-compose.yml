@@ -46,12 +46,16 @@ services:
     networks: [backend]
     restart: "no"
 
+  # api e worker usam a mesma imagem; o APP_ROLE decide o que cada um roda.
+  # A API só atende HTTP e enfileira; o worker faz a análise pesada. Assim uma
+  # análise grande não deixa o login e o resto do site esperando.
   api:
     build:
       context: ./backend
       target: runtime
     restart: unless-stopped
     environment:
+      APP_ROLE: api
       NODE_ENV: production
       PORT: 3000
       CORS_ORIGIN: ${PUBLIC_URL:-http://localhost:8080}
@@ -63,6 +67,39 @@ services:
       JWT_TTL: 15m
       REFRESH_TTL: 7d
       UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-10}
+      # só para o /api/meta dizer se o modo IA está ligado; quem chama a IA é o worker
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    volumes:
+      - uploads-ram:/app/tmp # a API grava o código enviado aqui e o worker lê
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    networks: [backend, frontend]
+
+  worker:
+    build:
+      context: ./backend
+      target: runtime
+    restart: unless-stopped
+    # sem JWT_SECRET de propósito: o worker abre código de desconhecidos e não emite tokens
+    environment:
+      APP_ROLE: worker
+      NODE_ENV: production
+      DATABASE_URL: postgresql://explicador:${POSTGRES_PASSWORD}@postgres:5432/explicador?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-10}
+      GITHUB_MAX_MB: ${GITHUB_MAX_MB:-50}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       AI_MODEL: ${AI_MODEL:-claude-opus-5-5}
     depends_on:
@@ -72,13 +109,20 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    # o healthcheck da imagem bate no HTTP, que o worker não tem
+    healthcheck:
+      disable: true
+    # tempo para terminar a análise em andamento antes de ser encerrado
+    stop_grace_period: 30s
     read_only: true
+    volumes:
+      - uploads-ram:/app/tmp
     tmpfs:
-      - /app/tmp:uid=1000,gid=1000,mode=0700 # zips temporários
       - /tmp
     security_opt:
       - no-new-privileges:true
-    networks: [backend, frontend]
+    # só a rede interna: o worker não recebe conexões, só sai para o GitHub e a IA
+    networks: [backend]
 
   web:
     build:
@@ -96,6 +140,15 @@ services:
 volumes:
   pgdata:
   redisdata:
+  # Código enviado esperando o worker. É tmpfs: fica na RAM, nunca no disco,
+  # e some num reinício. O worker apaga cada arquivo ao terminar a análise e
+  # uma faxina remove os esquecidos (mais de 30 min). uid 1000 = usuário node.
+  uploads-ram:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=256m,uid=1000,gid=1000,mode=0700"
 
 networks:
   backend:
