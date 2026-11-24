@@ -1,0 +1,90 @@
+# Deploy na Render (plano gratuito). Na Render isto faz o papel do
+# docker-compose.yml: diz quais serviços existem e como se ligam.
+# O Postgres fica fora (Neon): o da Render, no plano grátis, expira em 30 dias.
+#
+# Free = o backend dorme após 15 min sem acesso e leva ~1 min para acordar.
+# Ver docs/REGISTRO_DE_MUDANCAS.md (#005).
+
+services:
+  # API + worker no mesmo processo (APP_ROLE=all): na Render os dois não
+  # conseguiriam dividir a pasta de uploads.
+  - type: web
+    name: explicador-api
+    runtime: docker
+    plan: free
+    region: ohio # mesma região do Neon (AWS US East 2)
+    dockerfilePath: ./backend/Dockerfile # usa o último estágio (migrations + API)
+    dockerContext: ./backend
+    healthCheckPath: /api/ready
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_ROLE
+        value: all
+      # visitante -> borda da Render (site estático) -> borda da Render (API)
+      - key: TRUST_PROXY
+        value: 2
+      # mesma origem pelo rewrite abaixo; fica só por garantia
+      - key: CORS_ORIGIN
+        value: https://explicador-de-codigo.onrender.com
+      # conexão DIRETA do Neon (sem pooling): o prisma migrate precisa dela.
+      # A Render pergunta o valor só na criação do Blueprint.
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: explicador-redis
+          property: connectionString
+      # gerado pela Render; não passa pelo git
+      - key: JWT_SECRET
+        generateValue: true
+
+  # Fila do BullMQ. Free: 25 MB, só em memória (some se reiniciar).
+  - type: keyvalue
+    name: explicador-redis
+    plan: free
+    region: ohio
+    maxmemoryPolicy: noeviction # o bullmq exige: não pode descartar jobs
+    ipAllowList: [] # só a rede interna da Render
+
+  # Frontend: arquivos estáticos (o nginx do compose não é usado aqui).
+  - type: web
+    name: explicador-de-codigo
+    runtime: static
+    buildCommand: cd frontend && npm ci --no-audit --no-fund && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+    routes:
+      # /api na mesma origem do site: sem CORS e o cookie de refresh
+      # (sameSite strict) funciona igual ao compose. A ordem importa.
+      - type: rewrite
+        source: /api/*
+        destination: https://explicador-api.onrender.com/api/*
+      # SPA: qualquer outra rota cai no index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    # os mesmos cabeçalhos do frontend/nginx.conf.template
+    headers:
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: "camera=(), microphone=(), geolocation=()"
+      # o index.html fica com o padrão da Render (revalida a cada acesso)
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
