@@ -44,7 +44,8 @@ async function startApi() {
   const isProduction = config.get('NODE_ENV', { infer: true }) === 'production';
 
   app.setGlobalPrefix('api');
-  app.set('trust proxy', 1); // nginx na frente
+  // nginx (e, no Railway, a borda dele) na frente
+  app.set('trust proxy', config.get('TRUST_PROXY', { infer: true }));
   app.disable('x-powered-by');
   app.enableShutdownHooks();
 

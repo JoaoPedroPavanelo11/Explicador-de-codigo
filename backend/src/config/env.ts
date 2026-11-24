@@ -12,6 +12,10 @@ export const envSchema = z.object({
   APP_ROLE: appRoleSchema,
   PORT: z.coerce.number().int().positive().default(3000),
 
+  // quantos proxies há na frente da API, para o req.ip (usado no rate limit)
+  // ser o IP do visitante. docker compose: 1 (nginx). Railway: 2 (borda + nginx).
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1),
+
   // pode ter várias, separadas por vírgula
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 

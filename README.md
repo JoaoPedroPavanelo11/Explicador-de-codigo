@@ -463,7 +463,7 @@ A explicação de **cada commit** está em [`docs/COMMITS_EXPLICADOS.txt`](docs/
 │   │   ├── components/          CodeBlock, ScoreMeter, Prose…
 │   │   ├── pages/               telas
 │   │   └── index.css            design system
-│   ├── nginx.conf
+│   ├── nginx.conf.template
 │   └── Dockerfile
 ├── docs/                        documentação, imagens e exemplo de relatório
 ├── docker-compose.yml           projeto completo

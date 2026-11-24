@@ -20,6 +20,8 @@ export const QueueRootModule = BullModule.forRootAsync({
       port: config.get('REDIS_PORT', { infer: true }),
       password: config.get('REDIS_PASSWORD', { infer: true }) || undefined,
       maxRetriesPerRequest: null, // exigido pelo worker do bullmq
+      // IPv4 ou IPv6: a rede privada do Railway (*.railway.internal) pode ser só IPv6
+      family: 0,
     }),
   }),
 });

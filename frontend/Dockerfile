@@ -8,7 +8,11 @@ COPY . .
 RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# a imagem do nginx troca ${API_UPSTREAM} e ${NGINX_LOCAL_RESOLVERS} ao iniciar.
+# Padrão = docker compose; no Railway: API_UPSTREAM=<backend>.railway.internal:3000
+ENV API_UPSTREAM=api:3000
+ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=3s --retries=5 \
