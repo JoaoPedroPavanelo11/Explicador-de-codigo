@@ -7,7 +7,7 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.31-alpine AS runtime
 # a imagem do nginx troca ${API_UPSTREAM} e ${NGINX_LOCAL_RESOLVERS} ao iniciar.
 # Padrão = docker compose; no Railway: API_UPSTREAM=<backend>.railway.internal:3000
 ENV API_UPSTREAM=api:3000
